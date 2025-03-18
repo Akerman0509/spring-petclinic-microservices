@@ -16,13 +16,40 @@
 package org.springframework.samples.petclinic.discovery;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cloud.netflix.eureka.server.EurekaServerProperties;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
+@ActiveProfiles("test")
+@TestPropertySource(properties = {
+    "spring.cloud.config.enabled=false",
+    "eureka.client.register-with-eureka=false",
+    "eureka.client.fetch-registry=false"
+})
 class DiscoveryServerApplicationTests {
+
+	@Autowired
+	private EurekaServerProperties eurekaServerProperties;
 
 	@Test
 	void contextLoads() {
+		assertNotNull(eurekaServerProperties);
+	}
+
+	@Test
+	void eurekaServerPropertiesAreConfigured() {
+		assertNotNull(eurekaServerProperties.getServer());
+		assertNotNull(eurekaServerProperties.getClient());
+	}
+
+	@Test
+	void eurekaServerIsEnabled() {
+		assertTrue(eurekaServerProperties.getServer().isEnableSelfPreservation());
 	}
 
 }

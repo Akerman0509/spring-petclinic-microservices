@@ -34,7 +34,6 @@ class ApiGatewayControllerTest {
     @Autowired
     private WebTestClient client;
 
-
     @Test
     void getOwnerDetails_withAvailableVisitsService() {
         PetDetails cat = PetDetails.PetDetailsBuilder.aPetDetails()
@@ -64,9 +63,71 @@ class ApiGatewayControllerTest {
             .jsonPath("$.pets[0].visits[0].description").isEqualTo("First visit");
     }
 
-    /**
-     * Test Resilience4j fallback method
-     */
+    @Test
+    void getOwnerDetails_withMultiplePets() {
+        PetDetails cat = PetDetails.PetDetailsBuilder.aPetDetails()
+            .id(20)
+            .name("Garfield")
+            .visits(new ArrayList<>())
+            .build();
+        PetDetails dog = PetDetails.PetDetailsBuilder.aPetDetails()
+            .id(21)
+            .name("Max")
+            .visits(new ArrayList<>())
+            .build();
+        OwnerDetails owner = OwnerDetails.OwnerDetailsBuilder.anOwnerDetails()
+            .pets(List.of(cat, dog))
+            .build();
+        Mockito
+            .when(customersServiceClient.getOwner(1))
+            .thenReturn(Mono.just(owner));
+
+        VisitDetails catVisit = new VisitDetails(300, cat.id(), null, "Cat visit");
+        VisitDetails dogVisit = new VisitDetails(301, dog.id(), null, "Dog visit");
+        Visits visits = new Visits(List.of(catVisit, dogVisit));
+        Mockito
+            .when(visitsServiceClient.getVisitsForPets(List.of(cat.id(), dog.id())))
+            .thenReturn(Mono.just(visits));
+
+        client.get()
+            .uri("/api/gateway/owners/1")
+            .exchange()
+            .expectStatus().isOk()
+            .expectBody()
+            .jsonPath("$.pets[0].name").isEqualTo("Garfield")
+            .jsonPath("$.pets[0].visits[0].description").isEqualTo("Cat visit")
+            .jsonPath("$.pets[1].name").isEqualTo("Max")
+            .jsonPath("$.pets[1].visits[0].description").isEqualTo("Dog visit");
+    }
+
+    @Test
+    void getOwnerDetails_withNoVisits() {
+        PetDetails cat = PetDetails.PetDetailsBuilder.aPetDetails()
+            .id(20)
+            .name("Garfield")
+            .visits(new ArrayList<>())
+            .build();
+        OwnerDetails owner = OwnerDetails.OwnerDetailsBuilder.anOwnerDetails()
+            .pets(List.of(cat))
+            .build();
+        Mockito
+            .when(customersServiceClient.getOwner(1))
+            .thenReturn(Mono.just(owner));
+
+        Visits visits = new Visits(List.of());
+        Mockito
+            .when(visitsServiceClient.getVisitsForPets(Collections.singletonList(cat.id())))
+            .thenReturn(Mono.just(visits));
+
+        client.get()
+            .uri("/api/gateway/owners/1")
+            .exchange()
+            .expectStatus().isOk()
+            .expectBody()
+            .jsonPath("$.pets[0].name").isEqualTo("Garfield")
+            .jsonPath("$.pets[0].visits").isEmpty();
+    }
+
     @Test
     void getOwnerDetails_withServiceError() {
         PetDetails cat = PetDetails.PetDetailsBuilder.aPetDetails()
@@ -94,4 +155,15 @@ class ApiGatewayControllerTest {
             .jsonPath("$.pets[0].visits").isEmpty();
     }
 
+    @Test
+    void getOwnerDetails_withInvalidOwnerId() {
+        Mockito
+            .when(customersServiceClient.getOwner(-1))
+            .thenReturn(Mono.error(new RuntimeException("Invalid owner ID")));
+
+        client.get()
+            .uri("/api/gateway/owners/-1")
+            .exchange()
+            .expectStatus().is5xxServerError();
+    }
 }
