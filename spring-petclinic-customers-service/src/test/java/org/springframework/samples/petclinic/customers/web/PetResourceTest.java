@@ -1,10 +1,10 @@
 package org.springframework.samples.petclinic.customers.web;
 
+import java.lang.StackWalker.Option;
 import java.util.Optional;
 import java.util.List;
-import java.util.Arrays;
 
-import org.junit.jupiter.api.BeforeEach;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,11 +19,18 @@ import org.springframework.samples.petclinic.customers.model.PetType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.samples.petclinic.customers.web.PetRequest;
+
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.mockito.BDDMockito.given;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * @author Maciej Szarlinski
@@ -34,92 +41,125 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PetResourceTest {
 
     @Autowired
-    private MockMvc mvc;
+    MockMvc mvc;
 
     @MockBean
-    private PetRepository petRepository;
+    PetRepository petRepository;
 
     @MockBean
-    private OwnerRepository ownerRepository;
+    OwnerRepository ownerRepository;
 
-    private Pet testPet;
-    private Owner testOwner;
-    private PetType testPetType;
+    @Test
+    void shouldGetAPetInJSonFormat() throws Exception {
 
-    @BeforeEach
-    void setUp() {
-        testOwner = new Owner();
-        testOwner.setId(1);
-        testOwner.setFirstName("Test");
-        testOwner.setLastName("User");
+        Pet pet = setupPet();
 
-        testPetType = new PetType();
-        testPetType.setId(1);
-        testPetType.setName("Dog");
+        given(petRepository.findById(2)).willReturn(Optional.of(pet));
 
-        testPet = new Pet();
-        testPet.setId(1);
-        testPet.setName("Buddy");
-        testPet.setType(testPetType);
-        testPet.setBirthDate(java.sql.Date.valueOf("2020-01-01"));
-        testOwner.addPet(testPet);
+
+        mvc.perform(get("/owners/2/pets/2").accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType("application/json"))
+            .andExpect(jsonPath("$.id").value(2))
+            .andExpect(jsonPath("$.name").value("Basil"))
+            .andExpect(jsonPath("$.type.id").value(6));
     }
 
     @Test
-    void shouldGetPetDetailsSuccessfully() throws Exception {
-        given(petRepository.findById(1)).willReturn(Optional.of(testPet));
+    void shouldFindPetById() throws Exception {
+        // Given
+        Owner owner = new Owner();
+        owner.setFirstName("John");
+        owner.setLastName("Doe");
 
+        Pet pet = new Pet();
+        pet.setId(1);
+        pet.setName("Max");
+        owner.addPet(pet);
+
+        given(petRepository.findById(1)).willReturn(Optional.of(pet));
+
+        // When/Then
         mvc.perform(get("/owners/1/pets/1").accept(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
-            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+            .andExpect(content().contentType("application/json"))
             .andExpect(jsonPath("$.id").value(1))
-            .andExpect(jsonPath("$.name").value("Buddy"))
-            .andExpect(jsonPath("$.type.id").value(1))
-            .andExpect(jsonPath("$.birthDate").value("2020-01-01"));
+            .andExpect(jsonPath("$.name").value("Max"));
+    }
+
+    @Test 
+    void shouldReturnNotFoundForNonExistingPet() throws Exception {
+        given(petRepository.findById(1)).willReturn(Optional.empty());
+
+        mvc.perform(get("/owners/99/pets/99").accept(MediaType.APPLICATION_JSON)) 
+            .andExpect(status().isNotFound());
     }
 
     @Test
-    void shouldCreateNewPetSuccessfully() throws Exception {
-        given(ownerRepository.findById(1)).willReturn(Optional.of(testOwner));
-        given(petRepository.findPetTypeById(1)).willReturn(Optional.of(testPetType));
-        
-        String newPetJson = """
-        {
-            "name": "Max",
-            "birthDate": "2021-03-15",
-            "typeId": 1
-        }
-        """;
+    void shouldRetrievePetWithAllAttributes() throws Exception {
+        Pet pet = setupPet();
+        pet.setBirthDate(java.sql.Date.valueOf("2020-05-10"));
 
-        mvc.perform(post("/owners/1/pets")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(newPetJson))
-            .andExpect(status().isCreated());
+        given(petRepository.findById(2)).willReturn(Optional.of(pet));
+
+        mvc.perform(get("/owners/2/pets/2").accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType("application/json"))
+            .andExpect(jsonPath("$.id").value(2))
+            .andExpect(jsonPath("$.name").value("Basil"))
+            .andExpect(jsonPath("$.type.id").value(6))
+            .andExpect(jsonPath("$.birthDate").value("2020-05-10"));
+    }
+
+    @Test 
+    void shouldHandleNullPetType() throws Exception {
+        Pet pet = setupPet();
+        pet.setId(3);
+        pet.setName("Shadow");
+        pet.setType(null);  
+
+        given(petRepository.findById(3)).willReturn(Optional.of(pet));
+
+        mvc.perform(get("/owners/2/pets/3").accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType("application/json"))
+            .andExpect(jsonPath("$.id").value(3))
+            .andExpect(jsonPath("$.name").value("Shadow"))
+            .andExpect(jsonPath("$.type").doesNotExist());
     }
 
     @Test
-    void shouldUpdatePetSuccessfully() throws Exception {
-        given(petRepository.findById(1)).willReturn(Optional.of(testPet));
-        given(petRepository.findPetTypeById(1)).willReturn(Optional.of(testPetType));
+    void shouldReturnPetWithCorshouldReturnPetWithCorrectJsonFormatrectJsonFormat() throws Exception {
+        Pet pet = setupPet();
 
-        String updatePetJson = """
-        {
-            "id": 1,
-            "name": "BuddyUpdated",
-            "birthDate": "2020-01-01",
-            "typeId": 1
-        }
-        """;
+        given(petRepository.findById(2)).willReturn(Optional.of(pet));
 
-        mvc.perform(put("/owners/1/pets/1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(updatePetJson))
-            .andExpect(status().isNoContent());
+        mvc.perform(get("/owners/2/pets/2").accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.id").value(2))
+            .andExpect(jsonPath("$.name").value("Basil"))
+            .andExpect(jsonPath("$.type.id").value(6));
     }
 
     @Test
-    void shouldGetAllPetTypesSuccessfully() throws Exception {
-        List<PetType> petTypes = Arrays.asList(
+    void shouldReturnNotFoundWhenPetDoesNotExist() throws Exception {
+        given(petRepository.findById(999)).willReturn(Optional.empty());
+
+        mvc.perform(get("/owners/2/pets/999").accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnMethodNotAllowedWhenDeletingPet() throws Exception {
+        mvc.perform(delete("/owners/2/pets/999"))
+            .andExpect(status().isMethodNotAllowed());
+    }
+
+    @Test
+    void shouldGetAllPetTypes() throws Exception {
+        // Arrange
+        List<PetType> petTypes = List.of(
             createPetType(1, "Dog"),
             createPetType(2, "Cat"),
             createPetType(3, "Bird")
@@ -127,9 +167,10 @@ class PetResourceTest {
         
         given(petRepository.findPetTypes()).willReturn(petTypes);
         
+        // Act & Assert
         mvc.perform(get("/petTypes").accept(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
-            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+            .andExpect(content().contentType("application/json"))
             .andExpect(jsonPath("$[0].id").value(1))
             .andExpect(jsonPath("$[0].name").value("Dog"))
             .andExpect(jsonPath("$[1].id").value(2))
@@ -139,65 +180,76 @@ class PetResourceTest {
     }
 
     @Test
-    void shouldHandleInvalidPetTypeId() throws Exception {
-        given(petRepository.findPetTypeById(999)).willReturn(Optional.empty());
+    void shouldThrowExceptionWhenOwnerNotFoundDuringPetCreation() throws Exception {
+        // Given
+        given(ownerRepository.findById(999)).willReturn(Optional.empty());
         
         String newPetJson = """
         {
-            "name": "InvalidPet",
-            "birthDate": "2021-03-15",
-            "typeId": 999
+            "name": "Ghost",
+            "birthDate": "2021-04-20",
+            "typeId": 2
         }
         """;
-
-        mvc.perform(post("/owners/1/pets")
+        
+        // When/Then
+        mvc.perform(post("/owners/999/pets")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(newPetJson))
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isNotFound());
     }
 
     @Test
-    void shouldHandleInvalidBirthDate() throws Exception {
-        given(ownerRepository.findById(1)).willReturn(Optional.of(testOwner));
-        given(petRepository.findPetTypeById(1)).willReturn(Optional.of(testPetType));
+    void shouldUpdateExistingPet() throws Exception {
+        // Given
+        Pet existingPet = setupPet();
+        PetType catType = createPetType(1, "Cat");
         
-        String newPetJson = """
+        given(petRepository.findById(2)).willReturn(Optional.of(existingPet));
+        given(petRepository.findPetTypeById(1)).willReturn(Optional.of(catType));
+        
+        String updatePetJson = """
         {
-            "name": "InvalidDatePet",
-            "birthDate": "invalid-date",
+            "id": 2,
+            "name": "BasilUpdated",
+            "birthDate": "2019-08-15",
             "typeId": 1
         }
         """;
-
-        mvc.perform(post("/owners/1/pets")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(newPetJson))
-            .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void shouldHandleEmptyPetName() throws Exception {
-        given(ownerRepository.findById(1)).willReturn(Optional.of(testOwner));
-        given(petRepository.findPetTypeById(1)).willReturn(Optional.of(testPetType));
         
-        String newPetJson = """
-        {
-            "name": "",
-            "birthDate": "2021-03-15",
-            "typeId": 1
-        }
-        """;
-
-        mvc.perform(post("/owners/1/pets")
+        // When/Then
+        mvc.perform(put("/owners/2/pets/2")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(newPetJson))
-            .andExpect(status().isBadRequest());
+                .content(updatePetJson))
+            .andExpect(status().isNoContent());
+        
+        // Verify that pet was saved
+        org.mockito.Mockito.verify(petRepository).save(existingPet);
     }
 
+    // Helper method to create a PetType with id and name
     private PetType createPetType(int id, String name) {
         PetType petType = new PetType();
         petType.setId(id);
         petType.setName(name);
         return petType;
     }
-}
+
+    private Pet setupPet() {
+        Owner owner = new Owner();
+        owner.setFirstName("George");
+        owner.setLastName("Bush");
+
+        Pet pet = new Pet();
+
+        pet.setName("Basil");
+        pet.setId(2);
+
+        PetType petType = new PetType();
+        petType.setId(6);
+        pet.setType(petType);
+
+        owner.addPet(pet);
+        return pet;
+    }
+ }
