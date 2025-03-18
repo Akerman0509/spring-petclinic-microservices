@@ -19,7 +19,10 @@ import org.springframework.test.web.servlet.MockMvc;
 
 
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -43,11 +46,8 @@ class PetResourceTest {
 
     @Test
     void shouldGetAPetInJSonFormat() throws Exception {
-
         Pet pet = setupPet();
-
         given(petRepository.findById(2)).willReturn(Optional.of(pet));
-
 
         mvc.perform(get("/owners/2/pets/2").accept(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
@@ -55,6 +55,38 @@ class PetResourceTest {
             .andExpect(jsonPath("$.id").value(2))
             .andExpect(jsonPath("$.name").value("Basil"))
             .andExpect(jsonPath("$.type.id").value(6));
+    }
+
+    @Test
+    void shouldCreatePet() throws Exception {
+        Pet pet = setupPet();
+        given(petRepository.save(any(Pet.class))).willReturn(pet);
+        given(ownerRepository.findById(2)).willReturn(Optional.of(pet.getOwner()));
+
+        mvc.perform(post("/owners/2/pets")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Basil\",\"type\":{\"id\":6}}"))
+            .andExpect(status().isCreated())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.id").value(2))
+            .andExpect(jsonPath("$.name").value("Basil"))
+            .andExpect(jsonPath("$.type.id").value(6));
+
+        verify(petRepository).save(any(Pet.class));
+    }
+
+    @Test
+    void shouldUpdatePet() throws Exception {
+        Pet pet = setupPet();
+        given(petRepository.findById(2)).willReturn(Optional.of(pet));
+        given(petRepository.save(any(Pet.class))).willReturn(pet);
+
+        mvc.perform(put("/owners/2/pets/2")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Basil\",\"type\":{\"id\":6}}"))
+            .andExpect(status().isNoContent());
+
+        verify(petRepository).save(any(Pet.class));
     }
 
     private Pet setupPet() {

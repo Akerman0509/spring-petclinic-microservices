@@ -144,9 +144,29 @@ class OwnerResourceTest {
 
     @Test
     void shouldValidateOwnerCreation() throws Exception {
+        Owner owner = new Owner();
+        owner.setId(1);
+        owner.setFirstName("George");
+        owner.setLastName("Franklin");
+        owner.setAddress("110 W. Liberty St.");
+        owner.setCity("Madison");
+        owner.setTelephone("6085551023");
+
+        given(ownerEntityMapper.map(any(Owner.class), any(OwnerRequest.class))).willReturn(owner);
+        given(ownerRepository.save(any(Owner.class))).willReturn(owner);
+
         mvc.perform(post("/owners")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"firstName\":\"\",\"lastName\":\"\",\"address\":\"\",\"city\":\"\",\"telephone\":\"\"}"))
-            .andExpect(status().isBadRequest());
+                .content("{\"firstName\":\"George\",\"lastName\":\"Franklin\",\"address\":\"110 W. Liberty St.\",\"city\":\"Madison\",\"telephone\":\"6085551023\"}"))
+            .andExpect(status().isCreated())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.id").value(1))
+            .andExpect(jsonPath("$.firstName").value("George"))
+            .andExpect(jsonPath("$.lastName").value("Franklin"))
+            .andExpect(jsonPath("$.address").value("110 W. Liberty St."))
+            .andExpect(jsonPath("$.city").value("Madison"))
+            .andExpect(jsonPath("$.telephone").value("6085551023"));
+
+        verify(ownerRepository).save(any(Owner.class));
     }
 } 
