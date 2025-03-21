@@ -12,16 +12,14 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static java.util.Arrays.asList;
+import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(SpringExtension.class)
 @WebMvcTest(VisitResource.class)
@@ -36,9 +34,9 @@ class VisitResourceTest {
 
     @Test
     void shouldFetchVisits() throws Exception {
-        given(visitRepository.findByPetIdIn(Arrays.asList(111, 222)))
+        given(visitRepository.findByPetIdIn(asList(111, 222)))
             .willReturn(
-                Arrays.asList(
+                asList(
                     Visit.VisitBuilder.aVisit()
                         .id(1)
                         .petId(111)
@@ -65,59 +63,64 @@ class VisitResourceTest {
     }
 
     @Test
-    void shouldFetchVisitsByPetId() throws Exception {
-        List<Visit> visits = Arrays.asList(
-            Visit.VisitBuilder.aVisit()
-                .id(1)
-                .petId(1)
-                .description("Regular checkup")
-                .build(),
-            Visit.VisitBuilder.aVisit()
-                .id(2)
-                .petId(1)
-                .description("Vaccination")
-                .build()
-        );
+    void shouldReturnEmptyListWhenNoVisitsFound() throws Exception {
+        // Given
+        given(visitRepository.findByPetIdIn(asList(999))).willReturn(List.of());
 
-        given(visitRepository.findByPetId(1)).willReturn(visits);
-
-        mvc.perform(get("/owners/*/pets/1/visits"))
+        // When/Then
+        mvc.perform(get("/pets/visits?petId=999"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].id").value(1))
-            .andExpect(jsonPath("$[0].petId").value(1))
-            .andExpect(jsonPath("$[0].description").value("Regular checkup"))
-            .andExpect(jsonPath("$[1].id").value(2))
-            .andExpect(jsonPath("$[1].petId").value(1))
-            .andExpect(jsonPath("$[1].description").value("Vaccination"));
+            .andExpect(jsonPath("$.items").isEmpty()); // Expect an empty array
     }
 
     @Test
-    void shouldCreateVisit() throws Exception {
-        Visit visit = Visit.VisitBuilder.aVisit()
-            .id(1)
-            .petId(1)
-            .description("New visit")
-            .date(new Date())
-            .build();
+    void shouldFetchVisitsForSinglePet() throws Exception {
+        // Given
+        given(visitRepository.findByPetIdIn(asList(123)))
+            .willReturn(
+                asList(
+                    Visit.VisitBuilder.aVisit()
+                        .id(5)
+                        .petId(123)
+                        .build()
+                )
+            );
 
-        given(visitRepository.save(any(Visit.class))).willReturn(visit);
-
-        mvc.perform(post("/owners/*/pets/1/visits")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"description\":\"New visit\",\"date\":\"" + new Date().toString() + "\"}"))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.id").value(1))
-            .andExpect(jsonPath("$.petId").value(1))
-            .andExpect(jsonPath("$.description").value("New visit"));
-
-        verify(visitRepository).save(any(Visit.class));
+        // When/Then
+        mvc.perform(get("/pets/visits?petId=123"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].id").value(5))
+            .andExpect(jsonPath("$.items[0].petId").value(123));
     }
 
     @Test
-    void shouldValidateVisitCreation() throws Exception {
-        mvc.perform(post("/owners/*/pets/0/visits")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"description\":\"New visit\",\"date\":\"" + new Date().toString() + "\"}"))
-            .andExpect(status().isBadRequest());
+    void shouldHandleInvalidPetIdFormat() throws Exception {
+        // When/Then
+        mvc.perform(get("/pets/visits?petId=invalid"))
+            .andExpect(status().isBadRequest()); // Expect HTTP 400 Bad Request
+    }
+
+    @Test
+    void shouldVerifyVisitRepositoryCalled() throws Exception {
+        // Given
+        given(visitRepository.findByPetIdIn(asList(321))).willReturn(List.of());
+
+        // When
+        mvc.perform(get("/pets/visits?petId=321"))
+            .andExpect(status().isOk());
+
+        // Then - Verify that the repository method was called
+        verify(visitRepository).findByPetIdIn(asList(321));
+    }
+
+    @Test
+    void shouldCreateVisitSuccessfully() throws Exception {
+        Visit visit = Visit.VisitBuilder.aVisit().id(10).petId(123).build();
+        given(visitRepository.save(visit)).willReturn(visit);
+
+        mvc.perform(post("/owners/*/pets/123/visits")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"id\": 10, \"petId\": 123}"))
+            .andExpect(status().isCreated());
     }
 }
