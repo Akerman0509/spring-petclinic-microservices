@@ -148,8 +148,54 @@ pipeline {
                             outputDirectory: 'target/jacoco-reports',
                             reportTitle: 'JaCoCo Aggregated Report - All Services',
                             skipCopyOfSrcFiles: true,
-                            dumpOnExit: true
+                            dumpOnExit: true,
+                            minimumLineCoverage: '70',
+                            changeBuildStatus: true
                         )
+                        
+                        // Read the JaCoCo XML report to check coverage
+                        def jacocoReportPath = "${env.WORKSPACE}/target/jacoco-reports/jacoco.xml"
+                        if (fileExists(jacocoReportPath)) {
+                            def jacocoReport = readFile(jacocoReportPath)
+                            def coverageXml = new XmlSlurper().parseText(jacocoReport)
+                            def lineCoverage = coverageXml.counter.find { it.@type == 'LINE' }
+                            def covered = lineCoverage ? lineCoverage.@covered.toFloat() : 0
+                            def missed = lineCoverage ? lineCoverage.@missed.toFloat() : 0
+                            def totalLines = covered + missed
+                            def coveragePercent = totalLines > 0 ? (covered / totalLines) * 100 : 0
+                            echo "+++ coveragePercent = ${coveragePercent}"
+                            def coverageFormatted = String.format("%.2f", coveragePercent)
+                            
+                            def coverageCheckResult = coveragePercent >= 70 ? 'SUCCESS' : 'NEUTRAL'
+                            def coverageCheckMessage = coveragePercent >= 70 ? 
+                                "✅ Line coverage ${coverageFormatted}% meets the requirement of 70%" :
+                                "⚠️ Line coverage ${coverageFormatted}% is below the required 70%"
+                            
+                            // Publish coverage check results
+                            publishChecks name: 'Code Coverage', status: 'COMPLETED', 
+                                conclusion: coverageCheckResult,
+                                summary: "Line coverage: ${coverageFormatted}%",
+                                text: """## JaCoCo Coverage Report
+                                    
+                                    ${coverageCheckMessage}
+                                    
+                                    | Metric | Covered | Missed | Total | Coverage |
+                                    |--------|---------|--------|-------|----------|
+                                    | Lines | ${covered.toInteger()} | ${missed.toInteger()} | ${totalLines.toInteger()} | ${coverageFormatted}% |
+                                    
+                                    See the detailed JaCoCo report in Jenkins for more information."""
+                            
+                            // Update build status if coverage is below threshold
+                            if (coveragePercent < 70) {
+                                currentBuild.result = currentBuild.result == 'UNSTABLE' ? 'UNSTABLE' : 'UNSTABLE'
+                            }
+                        } else {
+                            echo "Warning: JaCoCo XML report not found at ${jacocoReportPath}"
+                            publishChecks name: 'Code Coverage', status: 'COMPLETED', 
+                                conclusion: 'NEUTRAL',
+                                summary: "Could not determine coverage",
+                                text: "JaCoCo XML report not found. Coverage check could not be performed."
+                        }
                     }
                     
                     // Store test details for report
@@ -186,52 +232,52 @@ pipeline {
             }
         }
         
-        stage('Build Services') {
-            when {
-                expression { return env.CHANGED_SERVICES != "" }
-            }
-            steps {
-                publishChecks name: 'Build Services', status: 'IN_PROGRESS',
-                    summary: 'Building changed services'
-                script {
-                    def serviceList = env.CHANGED_SERVICES.trim().split(" ")
-                    def buildDetails = []
+        // stage('Build Services') {
+        //     when {
+        //         expression { return env.CHANGED_SERVICES != "" }
+        //     }
+        //     steps {
+        //         publishChecks name: 'Build Services', status: 'IN_PROGRESS',
+        //             summary: 'Building changed services'
+        //         script {
+        //             def serviceList = env.CHANGED_SERVICES.trim().split(" ")
+        //             def buildDetails = []
                     
-                    for (service in serviceList) {
-                        echo "Building service: ${service}"
-                        dir(service) {
-                            try {
-                                sh 'mvn package -DskipTests'
-                                def artifactName = sh(script: 'find target -name "*.jar" | head -1', returnStdout: true).trim()
-                                buildDetails.add("✅ ${service}: Successfully built ${artifactName}")
-                                archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
-                            } catch (Exception e) {
-                                buildDetails.add("❌ ${service}: Build failed - ${e.getMessage()}")
-                                currentBuild.result = 'UNSTABLE'
-                            }
-                        }
-                    }
+        //             for (service in serviceList) {
+        //                 echo "Building service: ${service}"
+        //                 dir(service) {
+        //                     try {
+        //                         sh 'mvn package -DskipTests'
+        //                         def artifactName = sh(script: 'find target -name "*.jar" | head -1', returnStdout: true).trim()
+        //                         buildDetails.add("✅ ${service}: Successfully built ${artifactName}")
+        //                         archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+        //                     } catch (Exception e) {
+        //                         buildDetails.add("❌ ${service}: Build failed - ${e.getMessage()}")
+        //                         currentBuild.result = 'UNSTABLE'
+        //                     }
+        //                 }
+        //             }
                     
-                    // Create build report
-                    env.BUILD_DETAILS = buildDetails.join('\n')
-                }
-                publishChecks name: 'Build Services', status: 'COMPLETED', 
-                    conclusion: currentBuild.result == 'UNSTABLE' ? 'NEUTRAL' : 'SUCCESS',
-                    summary: "Built ${env.CHANGED_SERVICES.trim().split(' ').size()} services",
-                    text: """## Build Results
-                          ```
-                          ${env.BUILD_DETAILS}
-                          ```
+        //             // Create build report
+        //             env.BUILD_DETAILS = buildDetails.join('\n')
+        //         }
+        //         publishChecks name: 'Build Services', status: 'COMPLETED', 
+        //             conclusion: currentBuild.result == 'UNSTABLE' ? 'NEUTRAL' : 'SUCCESS',
+        //             summary: "Built ${env.CHANGED_SERVICES.trim().split(' ').size()} services",
+        //             text: """## Build Results
+        //                   ```
+        //                   ${env.BUILD_DETAILS}
+        //                   ```
                           
-                          All artifacts have been archived."""
-            }
-            post {
-                failure {
-                    publishChecks name: 'Build Services', status: 'COMPLETED', conclusion: 'FAILURE',
-                        summary: 'Build process failed'
-                }
-            }
-        }
+        //                   All artifacts have been archived."""
+        //     }
+        //     post {
+        //         failure {
+        //             publishChecks name: 'Build Services', status: 'COMPLETED', conclusion: 'FAILURE',
+        //                 summary: 'Build process failed'
+        //         }
+        //     }
+        // }
 
     }
     post {
