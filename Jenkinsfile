@@ -3,6 +3,10 @@ pipeline {
     options {
         buildDiscarder(logRotator(numToKeepStr: '5'))
     }
+    tools {
+        maven 'maven3'
+        jdk 'jdk17'
+    }
     environment {
         WORKSPACE = "${env.WORKSPACE}"
         // List of services without test folders       
