@@ -5,7 +5,7 @@ pipeline {
     }
     tools {
         maven 'maven3'
-        jdk 'jdk17'
+        // jdk 'jdk17'
     }
     environment {
         WORKSPACE = "${env.WORKSPACE}"
