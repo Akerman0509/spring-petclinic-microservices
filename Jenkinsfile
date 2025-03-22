@@ -102,7 +102,9 @@ pipeline {
                             // Check if the service has tests
                             if (!env.SERVICES_WITHOUT_TESTS.contains(service)) {
                                 try {
-                                    def testOutput = sh(script: 'mvn clean test -Djdk.attach.allowAttachSelf=true', returnStdout: true)
+                                    def testOutput = sh(script: 'mvn clean test', returnStdout: true)
+
+                                    // def testOutput = sh(script: 'mvn clean test -Djdk.attach.allowAttachSelf=true', returnStdout: true)
 
                                     testDetails[service] = [
                                         status: 'SUCCESS',
