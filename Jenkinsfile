@@ -1,4 +1,3 @@
-Nguyễn Lâm Anh Duy
 pipeline {
     agent any
     
