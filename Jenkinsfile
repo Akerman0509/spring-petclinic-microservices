@@ -33,7 +33,6 @@ pipeline {
         stage('Checkout') {
             steps {
                 script {
-                    echo "== WORKING IN branch: ${env.BRANCH_NAME}"
                     // Clean workspace
                     deleteDir()
                     
@@ -42,6 +41,7 @@ pipeline {
                     for (service in serviceList) {
                         def branchParam = service.toUpperCase().replaceAll('-', '_')
                         def branch = params[branchParam]
+                    echo "== WORKING IN branch: ${branch}"
                         
                         dir(service) {
                             checkout([
@@ -60,36 +60,36 @@ pipeline {
             }
         }
         
-        stage('Build and Push Docker Images') {
-            steps {
-                script {
-                    def serviceList = env.SERVICES.split(',')
-                    for (service in serviceList) {
-                        def branchParam = service.toUpperCase().replaceAll('-', '_')
-                        def branch = params[branchParam]
+        // stage('Build and Push Docker Images') {
+        //     steps {
+        //         script {
+        //             def serviceList = env.SERVICES.split(',')
+        //             for (service in serviceList) {
+        //                 def branchParam = service.toUpperCase().replaceAll('-', '_')
+        //                 def branch = params[branchParam]
                         
-                        dir(service) {
-                            // Get the latest commit ID for the branch
-                            def commitId = sh(script: "git rev-parse HEAD", returnStdout: true).trim()
+        //                 dir(service) {
+        //                     // Get the latest commit ID for the branch
+        //                     def commitId = sh(script: "git rev-parse HEAD", returnStdout: true).trim()
                             
-                            echo "Building ${service} from branch ${branch} with commit ID ${commitId}"
+        //                     echo "Building ${service} from branch ${branch} with commit ID ${commitId}"
                             
-                            // Build Docker image with commit ID as tag
-                            sh "docker build -t ${DOCKER_HUB_USERNAME}/${service}:${commitId} ."
+        //                     // Build Docker image with commit ID as tag
+        //                     sh "docker build -t ${DOCKER_HUB_USERNAME}/${service}:${commitId} ."
                             
-                            // Push image to Docker Hub
-                            sh "docker push ${DOCKER_HUB_USERNAME}/${service}:${commitId}"
+        //                     // Push image to Docker Hub
+        //                     sh "docker push ${DOCKER_HUB_USERNAME}/${service}:${commitId}"
                             
-                            // If this is the main branch, also tag as latest
-                            if (branch == 'main') {
-                                sh "docker tag ${DOCKER_HUB_USERNAME}/${service}:${commitId} ${DOCKER_HUB_USERNAME}/${service}:latest"
-                                sh "docker push ${DOCKER_HUB_USERNAME}/${service}:latest"
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        //                     // If this is the main branch, also tag as latest
+        //                     if (branch == 'main') {
+        //                         sh "docker tag ${DOCKER_HUB_USERNAME}/${service}:${commitId} ${DOCKER_HUB_USERNAME}/${service}:latest"
+        //                         sh "docker push ${DOCKER_HUB_USERNAME}/${service}:latest"
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
         
 //         stage('Deploy to Kubernetes') {
 //             when {
