@@ -20,11 +20,11 @@ pipeline {
         // Kubernetes config
         // KUBECONFIG = credentials('kubeconfig')
         // Docker Hub username
-        DOCKER_HUB_USERNAME = 'duyzhii'
+        DOCKER_HUB_USERNAME = 'akerman0509'
         // Base domain for developer testing
-        BASE_DOMAIN = 'petclinic.local'
+        // BASE_DOMAIN = 'petclinic.local'
         // Git repository URL
-        GIT_REPO_URL = 'https://github.com/Duyzhii/spring-petclinic-microservices.git'
+        GIT_REPO_URL = 'https://github.com/Akerman0509/spring-petclinic-microservices.git'
         // Services list
         SERVICES = 'customers-service,vets-service,visits-service,api-gateway,config-server,discovery-server,admin-server'
     }
@@ -33,6 +33,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 script {
+                    echo "== WORKING IN branch: ${env.BRANCH_NAME}"
                     // Clean workspace
                     deleteDir()
                     
