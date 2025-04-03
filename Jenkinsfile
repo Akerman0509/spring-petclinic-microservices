@@ -17,7 +17,7 @@ pipeline {
     
     environment {
         // Docker Hub credentials
-        DOCKER_HUB_CREDS = credentials('docker-hub-credentials')
+        // DOCKER_HUB_CREDS = credentials('docker-hub-credentials')
         // Docker Hub username
         DOCKER_HUB_USERNAME = 'akerman0509'
         // Git repository URL
