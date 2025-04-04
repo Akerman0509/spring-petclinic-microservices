@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent { label 'ec2-agent' }
     
     parameters {
         // Parameters to specify which branch to deploy for each service
