@@ -155,7 +155,7 @@ pipeline {
                             classPattern: jacocoClassDirs.join(','),
                             sourcePattern: jacocoSrcDirs.join(','),
                             exclusionPattern: '**/src/test*',
-                            outputDirectory: "${env.WORKSPACE}/jacoco-aggregate-report",
+                            outputDirectory: "${env.WORKSPACE}/jacoco-aggregate-report/",
                             reportTitle: 'JaCoCo Aggregated Report - All Services',
                             skipCopyOfSrcFiles: true,
                             dumpOnExit: true,
