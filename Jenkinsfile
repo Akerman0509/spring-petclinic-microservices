@@ -151,19 +151,30 @@ pipeline {
 
                         echo "Generating aggregated JaCoCo report for ${jacocoExecFiles.size()} services"
                         jacoco(
-                            execPattern: jacocoExecFiles.collect { "${env.WORKSPACE}/${it}" }.join(','),
-                            classPattern: jacocoClassDirs.collect { "${env.WORKSPACE}/${it}" }.join(','),
-                            sourcePattern: jacocoSrcDirs.collect { "${env.WORKSPACE}/${it}" }.join(','),
-                            // exclusionPattern: '**/src/test*', // Try without this for now
-                            outputDirectory: "${env.WORKSPACE}/jacoco-aggregate-report",
+                            execPattern: '**/target/jacoco.exec',
+                            classPattern: jacocoClassDirs.join(','),
+                            sourcePattern: jacocoSrcDirs.join(','),
+                            // exclusionPattern: '**/src/test*',
+                            outputDirectory: "${env.WORKSPACE}/jacoco-aggregate-report/",
                             reportTitle: 'JaCoCo Aggregated Report - All Services',
                             skipCopyOfSrcFiles: true,
                             dumpOnExit: true,
                             minimumLineCoverage: '70',
                             changeBuildStatus: true
                         )
-
-                        
+                        // jacoco(
+                        //     execPattern: jacocoExecFiles.collect { "${env.WORKSPACE}/${it}" }.join(','),
+                        //     classPattern: jacocoClassDirs.collect { "${env.WORKSPACE}/${it}" }.join(','),
+                        //     sourcePattern: jacocoSrcDirs.collect { "${env.WORKSPACE}/${it}" }.join(','),
+                        //     // exclusionPattern: '**/src/test*', // Try without this for now
+                        //     outputDirectory: "${env.WORKSPACE}/jacoco-aggregate-report",
+                        //     reportTitle: 'JaCoCo Aggregated Report - All Services',
+                        //     skipCopyOfSrcFiles: true,
+                        //     dumpOnExit: true,
+                        //     minimumLineCoverage: '70',
+                        //     changeBuildStatus: true
+                        // )
+                       
                         // Read the JaCoCo XML report to check coverage
                         // def jacocoReportPath = "${env.WORKSPACE}/target/jacoco-reports/jacoco.xml"
                         def jacocoReportPath = "${env.WORKSPACE}/jacoco-aggregate-report/jacoco.xml"
