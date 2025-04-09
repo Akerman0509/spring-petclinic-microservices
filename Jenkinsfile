@@ -106,7 +106,7 @@ pipeline {
                             
                             // Get image info (assuming the image is named the same as the service directory)
                             // def imageName = service.replace("spring-petclinic-", "")
-                            def baseImageName = "\$DOCKER_USERNAME/${imageName}"
+                            def baseImageName = "\$DOCKER_USERNAME/${service}"
                             
                             // Tag the image with commit ID
                             sh "docker tag ${baseImageName}:latest ${baseImageName}:${env.COMMIT_ID}"
@@ -120,6 +120,12 @@ pipeline {
                 }
             }
             // ...post actions remain the same
+        }
+        stage('Clean') {
+            steps {
+                echo 'Cleaning workspace and build artifacts...'
+                deleteDir() // Deletes all files in the workspace
+            }
         }
     }
 }
