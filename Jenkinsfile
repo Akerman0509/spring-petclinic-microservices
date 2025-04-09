@@ -117,7 +117,7 @@ pipeline {
                         //     sh "docker push ${baseImageName}:${env.COMMIT_ID}"
                         // }
                         
-                            service = services[1]
+                            service = "spring-petclinic-api-gateway"
                             echo "Building Docker image for ${service}"
                             
                             // Build the service and its Docker image
