@@ -136,19 +136,19 @@ pipeline {
                             echo "Building Docker image for ${service}"
                             
                             // Build the service and its Docker image
-                            sh "./mvnw clean install -PbuildDocker -pl ${service}"
+                            // sh "./mvnw clean install -PbuildDocker -pl ${service}"
                             
                             // Get image info (assuming the image is named the same as the service directory)
                             // def imageName = service.replace("spring-petclinic-", "")
                             def baseImageName = "\$DOCKER_USERNAME/${service}"
                             
                             // Tag the image with commit ID
-                            sh "docker tag ${baseImageName}:latest ${baseImageName}:${env.COMMIT_ID}"
+                            // sh "docker tag ${baseImageName}:latest ${baseImageName}:${env.COMMIT_ID}"
                             
                             // Push both tags to Docker Hub
                             echo "Pushing ${baseImageName}:latest and ${baseImageName}:${env.COMMIT_ID} to Docker Hub"
-                            sh "docker push ${baseImageName}:latest"
-                            sh "docker push ${baseImageName}:${env.COMMIT_ID}"
+                            // sh "docker push ${baseImageName}:latest"
+                            // sh "docker push ${baseImageName}:${env.COMMIT_ID}"
                         
                     }
                 }
