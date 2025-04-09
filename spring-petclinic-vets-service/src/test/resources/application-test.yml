@@ -18,3 +18,7 @@ vets:
   cache:
     ttl: 10
     heap-size: 10
+
+logging:
+  file:
+    name: logs/spring.log  # Or leave empty to disable file logging
