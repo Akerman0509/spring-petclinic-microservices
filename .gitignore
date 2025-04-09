@@ -23,3 +23,5 @@ generated/
 **/.DS_Store
 
 /archivePr1
+
+*.log
