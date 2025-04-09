@@ -148,36 +148,21 @@ pipeline {
                     
                     // Generate a single aggregated JaCoCo report outside the loop
                     if (jacocoExecFiles.size() > 0) {
-
                         echo "Generating aggregated JaCoCo report for ${jacocoExecFiles.size()} services"
                         jacoco(
                             execPattern: '**/target/jacoco.exec',
                             classPattern: jacocoClassDirs.join(','),
                             sourcePattern: jacocoSrcDirs.join(','),
-                            // exclusionPattern: '**/src/test*',
-                            outputDirectory: "${env.WORKSPACE}/jacoco-aggregate-report/",
-                            reportTitle: 'JaCoCo Aggregated Report - All Services',
+                            // Removed unsupported parameters: outputDirectory, reportTitle, dumpOnExit
                             skipCopyOfSrcFiles: true,
-                            dumpOnExit: true,
                             minimumLineCoverage: '70',
                             changeBuildStatus: true
                         )
-                        // jacoco(
-                        //     execPattern: jacocoExecFiles.collect { "${env.WORKSPACE}/${it}" }.join(','),
-                        //     classPattern: jacocoClassDirs.collect { "${env.WORKSPACE}/${it}" }.join(','),
-                        //     sourcePattern: jacocoSrcDirs.collect { "${env.WORKSPACE}/${it}" }.join(','),
-                        //     // exclusionPattern: '**/src/test*', // Try without this for now
-                        //     outputDirectory: "${env.WORKSPACE}/jacoco-aggregate-report",
-                        //     reportTitle: 'JaCoCo Aggregated Report - All Services',
-                        //     skipCopyOfSrcFiles: true,
-                        //     dumpOnExit: true,
-                        //     minimumLineCoverage: '70',
-                        //     changeBuildStatus: true
-                        // )
+                        
+                        // Update the path to check for the default JaCoCo report location
+                        def jacocoReportPath = "${env.WORKSPACE}/target/site/jacoco/jacoco.xml"
                        
-                        // Read the JaCoCo XML report to check coverage
-                        // def jacocoReportPath = "${env.WORKSPACE}/target/jacoco-reports/jacoco.xml"
-                        def jacocoReportPath = "${env.WORKSPACE}/jacoco-aggregate-report/jacoco.xml"
+
 
                         if (fileExists(jacocoReportPath)) {
                             def jacocoReport = readFile(jacocoReportPath)
