@@ -101,12 +101,13 @@ pipeline {
                     def jacocoSrcDirs = []
                     
                     for (service in serviceList) {
+                        echo "Running tests for service: ${service}"
                         echo "Testing service: ${service}"
-                        dir(service) {
+                        // dir(service) {
                             // Check if the service has tests
                             if (!env.SERVICES_WITHOUT_TESTS.contains(service)) {
                                 try {
-                                    def testOutput = sh(script: '../mvnw clean test -pl ${service}', returnStdout: true)
+                                    def testOutput = sh(script: "./mvnw clean test -pl ${service}", returnStdout: true)
 
                                     // def testOutput = sh(script: 'mvn clean test -Djdk.attach.allowAttachSelf=true', returnStdout: true)
 
@@ -140,7 +141,7 @@ pipeline {
                                     status: 'SKIPPED',
                                     reason: 'No test folders'
                                 ]
-                            }
+                            // }
                         }
                     }
                     
