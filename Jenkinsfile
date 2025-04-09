@@ -9,6 +9,7 @@ pipeline {
         string(name: 'VETS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for vets-service')
         string(name: 'GENAI_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for genai-service')
     }
+
     environment {
         WORKSPACE = "${env.WORKSPACE}"
         // List of services without test folders       
@@ -19,6 +20,14 @@ pipeline {
         DOCKER_HUB_CREDS = credentials('docker-hub-credentials')
     }
     stages {
+        stage('Print Parameters') {
+            steps {
+                echo "customers-service: ${params.CUSTOMERS_BRANCH}"
+                echo "visits-service: ${params.VISITS_BRANCH}"
+                echo "vets-service: ${params.VETS_BRANCH}"
+                echo "genai-service: ${params.GENAI_BRANCH}"
+            }
+        }
         stage('Detect Branch and Changes') {
             steps {
                 script {
