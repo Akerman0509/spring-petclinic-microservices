@@ -155,7 +155,7 @@ pipeline {
                             classPattern: jacocoClassDirs.join(','),
                             sourcePattern: jacocoSrcDirs.join(','),
                             exclusionPattern: '**/src/test*',
-                            outputDirectory: 'target/jacoco-reports',
+                            outputDirectory: "${env.WORKSPACE}/jacoco-aggregate-report",
                             reportTitle: 'JaCoCo Aggregated Report - All Services',
                             skipCopyOfSrcFiles: true,
                             dumpOnExit: true,
@@ -164,7 +164,9 @@ pipeline {
                         )
                         
                         // Read the JaCoCo XML report to check coverage
-                        def jacocoReportPath = "${env.WORKSPACE}/target/jacoco-reports/jacoco.xml"
+                        // def jacocoReportPath = "${env.WORKSPACE}/target/jacoco-reports/jacoco.xml"
+                        def jacocoReportPath = "${env.WORKSPACE}/jacoco-aggregate-report/jacoco.xml"
+
                         if (fileExists(jacocoReportPath)) {
                             def jacocoReport = readFile(jacocoReportPath)
                             def coverageXml = new XmlSlurper().parseText(jacocoReport)
