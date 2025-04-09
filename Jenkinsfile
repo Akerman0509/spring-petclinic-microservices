@@ -22,10 +22,10 @@ pipeline {
     stages {
         stage('Print Parameters') {
             steps {
-                echo "customers-service: ${params.CUSTOMERS_BRANCH}"
-                echo "visits-service: ${params.VISITS_BRANCH}"
-                echo "vets-service: ${params.VETS_BRANCH}"
-                echo "genai-service: ${params.GENAI_BRANCH}"
+                echo "customers-service: ${params.CUSTOMERS_SERVICE_BRANCH}"
+                echo "visits-service: ${params.VISITS_SERVICE_BRANCH}"
+                echo "vets-service: ${params.VETS_SERVICE_BRANCH}"
+                echo "genai-service: ${params.GENAI_SERVICE_BRANCH}"
             }
         }
         stage('Detect Branch and Changes') {
