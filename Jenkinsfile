@@ -20,14 +20,6 @@ pipeline {
         DOCKER_HUB_CREDS = credentials('docker-hub-credentials')
     }
     stages {
-        stage('Print Parameters') {
-            steps {
-                echo "customers-service: ${params.CUSTOMERS_SERVICE_BRANCH}"
-                echo "visits-service: ${params.VISITS_SERVICE_BRANCH}"
-                echo "vets-service: ${params.VETS_SERVICE_BRANCH}"
-                echo "genai-service: ${params.GENAI_SERVICE_BRANCH}"
-            }
-        }
         stage('Detect Branch and Changes') {
             steps {
                 script {
@@ -120,7 +112,6 @@ pipeline {
                             sh "./mvnw clean install -PbuildDocker -pl ${service}"
                             
                             // Get image info (assuming the image is named the same as the service directory)
-                            // def imageName = service.replace("spring-petclinic-", "")
                             def baseImageName = "\$DOCKER_USERNAME/${service}"
                             
                             // Tag the image with commit ID
