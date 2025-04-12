@@ -166,12 +166,17 @@ pipeline {
                             ]
                         }
                     }
-                    echo "outside of loop"
-                    
+                    if (testPasses == 0) {
+                        currentBuild.result = 'FAILURE'
+                    } else if (testFailures > 0) {
+                        currentBuild.result = 'UNSTABLE'
+                    } else {
+                        currentBuild.result = 'SUCCESS'
+                    } 
+                    echo "currentBuild.result: ${currentBuild.result}"
                     
                     // Store test details for report
                     env.TEST_SUMMARY = "Tests passed: ${testPasses}, failed: ${testFailures}, skipped: ${serviceList.size() - testPasses - testFailures}"
-                    
                     // Create detailed test report text
                     def testReportText = "# Test Results Summary\n\n"
                     testReportText += "| Service | Status | Details |\n"
@@ -189,11 +194,9 @@ pipeline {
                     testReportText += "## JaCoCo Coverage\nSee Jenkins coverage reports for aggregated code coverage information."
                     
                     env.TEST_REPORT = testReportText
-                    echo "currentBuild.result: ${currentBuild.result}"
-                    echo "changedServices: ${env.CHANGED_SERVICES}"
                 }
                 publishChecks name: 'Test Services', status: 'COMPLETED', 
-                    conclusion: currentBuild.result == 'UNSTABLE' ? 'NEUTRAL' : 'SUCCESS',
+                    conclusion: currentBuild.result,
                     summary: env.TEST_SUMMARY,
                     text: env.TEST_REPORT
             }
