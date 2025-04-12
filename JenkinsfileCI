@@ -88,7 +88,7 @@ pipeline {
                             if (changedFiles.contains("pom.xml") || 
                                 changedFiles.contains(".github") || 
                                 changedFiles.contains("docker-compose") ||
-                                changedFiles.contains("Jenkinsfile")) {
+                                changedFiles.contains("JenkinsfileCI")) {
                                 echo "Common files changed, will build all services"
                                 env.CHANGED_SERVICES = env.ALL_SERVICES
                             } else {
