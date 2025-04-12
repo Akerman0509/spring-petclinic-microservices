@@ -216,9 +216,19 @@ pipeline {
                 // Run if services were changed AND the build is not already a FAILURE
                 // Don't push images if tests failed catastrophically (FAILURE), but DO push if only UNSTABLE
                 expression {
-                    def hasChangedServices = env.CHANGED_SERVICES?.trim()
+                    echo "WHEN_CHECK: env.CHANGED_SERVICES = '${env.CHANGED_SERVICES}'" // Log the value it sees
+                    def changedServicesValue = env.CHANGED_SERVICES?.trim()
+                    echo "WHEN_CHECK: trimmed value = '${changedServicesValue}'"       // Log the trimmed value
+                    echo "WHEN_CHECK: Groovy truth of trimmed value = ${!!changedServicesValue}" // Explicitly check Groovy truth (!! converts to boolean)
+
+                    echo "WHEN_CHECK: currentBuild.result = '${currentBuild.result}'" // Log the result it sees
                     def isFailure = currentBuild.result == 'FAILURE'
-                    return hasChangedServices && !isFailure
+                    echo "WHEN_CHECK: isFailure = ${isFailure}"
+
+                    def finalResult = changedServicesValue && !isFailure // Use the trimmed value directly
+                    echo "WHEN_CHECK: final calculated result = ${finalResult}"
+
+                    return finalResult
                 }
             }
             steps {
