@@ -287,6 +287,7 @@ pipeline {
             }
             post {
                 success {
+                    script{
                     def successSummary = "Successfully built & pushed images for ${env.CHANGED_SERVICES.trim().split(' ').size()} service(s)."
                     def successDetails = """## Build & Push Successful
                         **Commit:** ${env.COMMIT_ID}
@@ -295,8 +296,10 @@ pipeline {
                         ${env.CHANGED_SERVICES}
                         ```"""
                     publishBuildStatus(checkName: 'Build & Push Images', conclusion: 'SUCCESS', summary: successSummary, details: successDetails)
+                    }
                 }
                 failure {
+                    script{
                     echo "Failed to build or push Docker images."
                     def failureSummary = 'Failed during Docker build or push stage.'
                     def failureDetails = """## Build & Push Failed
@@ -307,6 +310,7 @@ pipeline {
                     ${env.CHANGED_SERVICES ?: 'N/A'}
                     ```"""
                     publishBuildStatus(checkName: 'Build & Push Images', conclusion: 'FAILURE', summary: failureSummary, details: failureDetails)
+                    }
                 }
                 always {
                     script {
