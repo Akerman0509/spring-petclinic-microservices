@@ -1,49 +1,4 @@
-// ============================================
-// Helper Functions
-// ============================================
 
-/**
- * Detects which services have changed based on the branch and git diff.
- * (Implementation remains the same)
- */
-def detectChangedServices(String branchName, String allServices) {
-    echo "Detecting changes for Branch: ${branchName}"
-    def result = [changedServices: '', changedFiles: '']
-
-    if (branchName == 'main') {
-        echo "This is the main branch - will build all services"
-        result.changedServices = allServices
-        result.changedFiles = "N/A (main branch build)"
-    } else {
-        def changedFilesOutput = sh(script: "git diff --name-only HEAD~1 HEAD", returnStdout: true).trim()
-        result.changedFiles = changedFilesOutput
-        echo "Changed files detected:\n${result.changedFiles}"
-
-        def servicesList = allServices.split(" ")
-        def servicesToBuild = []
-
-        for (service in servicesList) {
-            if (result.changedFiles.contains("${service}/")) {
-                servicesToBuild.add(service)
-            }
-        }
-        result.changedServices = servicesToBuild.join(" ")
-
-        if (result.changedServices.trim() == "") {
-            if (result.changedFiles.contains("pom.xml") ||
-                result.changedFiles.contains(".github/") ||
-                result.changedFiles.contains("docker-compose") ||
-                result.changedFiles.contains("Jenkinsfile")) {
-                echo "Common files changed, will build all services"
-                result.changedServices = allServices
-            } else {
-                echo "No relevant service or common file changes detected"
-            }
-        }
-    }
-    echo "Services to build: ${result.changedServices ?: 'None'}"
-    return result
-}
 
 /**
  * Builds the Maven project for a service and builds/pushes its Docker image.
@@ -105,50 +60,68 @@ pipeline {
     }
     stages {
         stage('Detect Branch and Changes') {
-            // (Stage remains the same as previous version)
             steps {
                 script {
-                    def changes = detectChangedServices(env.BRANCH_NAME ?: 'main', env.ALL_SERVICES)
-                    env.CHANGED_SERVICES = changes.changedServices
-                    env.CHANGED_FILES = changes.changedFiles
-
-                    if (env.CHANGED_SERVICES?.trim()) {
-                       env.COMMIT_ID = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-                       echo "Commit ID for Docker tags: ${env.COMMIT_ID}"
+                    echo "Running pipeline for Branch: ${env.BRANCH_NAME}"
+                    
+                    // Check if this is the main branch
+                    if (env.BRANCH_NAME == 'main') {
+                        echo "This is the main branch - will build all services"
+                        env.CHANGED_SERVICES = env.ALL_SERVICES
                     } else {
-                       echo "No services to build, skipping commit ID retrieval."
-                       env.COMMIT_ID = "N/A"
+                        // For non-main branches, detect changes
+                        // Get changed files between current and previous commit
+                        def changedFiles = sh(script: "git diff --name-only HEAD~1 HEAD", returnStdout: true).trim()
+                        
+                        // Define service directories to monitor
+                        def services = env.ALL_SERVICES.split(" ")
+                        
+                        // Identify which services have changes
+                        env.CHANGED_SERVICES = ""
+                        for (service in services) {
+                            if (changedFiles.contains(service)) {
+                                env.CHANGED_SERVICES = env.CHANGED_SERVICES + " " + service
+                            }
+                        }
+                        // If no specific service changes detected, check for common changes
+                        if (env.CHANGED_SERVICES == "") {
+                            if (changedFiles.contains("pom.xml") || 
+                                changedFiles.contains(".github") || 
+                                changedFiles.contains("docker-compose") ||
+                                changedFiles.contains("Jenkinsfile")) {
+                                echo "Common files changed, will build all services"
+                                env.CHANGED_SERVICES = env.ALL_SERVICES
+                            } else {
+                                echo "No relevant changes detected"
+                            }
+                        }
+                        
+                        // Store changed files for detailed reporting
+                        env.CHANGED_FILES = changedFiles
                     }
-
-                    def summaryText = env.BRANCH_NAME == 'main' ?
-                        "Building all services on main branch" :
-                        "Changed files detected: ${env.CHANGED_FILES?.split('\n')?.size() ?: 0}"
-                    def detailsText = env.BRANCH_NAME == 'main' ?
+                    
+                    echo "Services to build: ${env.CHANGED_SERVICES}"
+                }
+                
+                publishChecks name: 'Detect Changes', status: 'COMPLETED', conclusion: 'SUCCESS', 
+                    summary: env.BRANCH_NAME == 'main' ? "Building all services on main branch" : "Changed files detected: ${env.CHANGED_FILES?.split('\n')?.size() ?: 0}",
+                    text: env.BRANCH_NAME == 'main' ? 
                         """## Main Branch Build
                         Building all services because this is the main branch.""" :
-                        """## Changed Files Analysis
-                        **Branch:** ${env.BRANCH_NAME}
-                        ### Changed Files (${env.CHANGED_FILES?.split('\n')?.size() ?: 0}):
+                        """## Changed Files
                         ```
                         ${env.CHANGED_FILES ?: 'No changes detected'}
                         ```
-                        ---
-                        ### Services to Build/Test:
+                        
+                        ## Services to Build
                         ```
-                        ${env.CHANGED_SERVICES ?: 'No services targeted'}
-                        ```""" // Updated text slightly
-
-                    publishBuildStatus(checkName: 'Detect Changes', conclusion: 'SUCCESS', summary: summaryText, details: detailsText)
-                }
+                        ${env.CHANGED_SERVICES ?: 'No services to build'}
+                        ```"""
             }
             post {
                 failure {
-                    publishBuildStatus(checkName: 'Detect Changes',
-                                       conclusion: 'FAILURE',
-                                       summary: 'Failed to detect changes or get commit ID.',
-                                       details: """## Detect Changes Failed
-                                       An error occurred during the change detection stage. Check console output.
-                                       **Branch:** ${env.BRANCH_NAME ?: 'Unknown'}""")
+                    publishChecks name: 'Detect Changes', status: 'COMPLETED', conclusion: 'FAILURE', 
+                        summary: 'Failed to detect changes'
                 }
             }
         }
