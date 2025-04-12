@@ -46,6 +46,7 @@ pipeline {
         WORKSPACE = "${env.WORKSPACE}"
         // List of services without test folders       
         SERVICES_WITHOUT_TESTS = "spring-petclinic-admin-server spring-petclinic-genai-service"
+        DOCKER_HUB_CREDS = credentials('docker-hub-credentials')
         // Full list of services
         ALL_SERVICES = "spring-petclinic-admin-server spring-petclinic-api-gateway spring-petclinic-config-server spring-petclinic-customers-service spring-petclinic-discovery-server spring-petclinic-genai-service spring-petclinic-vets-service spring-petclinic-visits-service"
     }
@@ -117,120 +118,120 @@ pipeline {
             }
         }
 
-        stage('Test Services') {
-            when {
-                expression { return env.CHANGED_SERVICES != "" }
-            }
-            steps {
-                publishChecks name: 'Test Services', status: 'IN_PROGRESS', 
-                    summary: 'Running tests for changed services'
-                script {
-                    def serviceList = env.CHANGED_SERVICES.trim().split(" ")
-                    def testDetails = [:]
-                    def testFailures = 0
-                    def testPasses = 0
+        // stage('Test Services') {
+        //     when {
+        //         expression { return env.CHANGED_SERVICES != "" }
+        //     }
+        //     steps {
+        //         publishChecks name: 'Test Services', status: 'IN_PROGRESS', 
+        //             summary: 'Running tests for changed services'
+        //         script {
+        //             def serviceList = env.CHANGED_SERVICES.trim().split(" ")
+        //             def testDetails = [:]
+        //             def testFailures = 0
+        //             def testPasses = 0
                     
 
-                    for (service in serviceList) {
-                        echo "Running tests for service: ${service}"
-                        echo "Testing service: ${service}"
-                        // Check if the service has tests
-                        if (!env.SERVICES_WITHOUT_TESTS.contains(service)) {
-                            try {
-                                def testOutput = sh(script: "./mvnw clean verify -pl ${service}", returnStdout: true)
+        //             for (service in serviceList) {
+        //                 echo "Running tests for service: ${service}"
+        //                 echo "Testing service: ${service}"
+        //                 // Check if the service has tests
+        //                 if (!env.SERVICES_WITHOUT_TESTS.contains(service)) {
+        //                     try {
+        //                         def testOutput = sh(script: "./mvnw clean verify -pl ${service}", returnStdout: true)
 
-                                // def testOutput = sh(script: 'mvn clean test -Djdk.attach.allowAttachSelf=true', returnStdout: true)
+        //                         // def testOutput = sh(script: 'mvn clean test -Djdk.attach.allowAttachSelf=true', returnStdout: true)
 
-                                testDetails[service] = [
-                                    status: 'SUCCESS',
-                                    output: testOutput
-                                ]
-                                testPasses++
-                            } catch (Exception e) {
-                                echo "Warning: Tests failed for ${service}, but continuing pipeline"
-                                testDetails[service] = [
-                                    status: 'FAILURE',
-                                    error: e.getMessage()
-                                ]
-                                testFailures++
-                                currentBuild.result = 'UNSTABLE'
-                            } finally {
-                                // Publish test results regardless of test success/failure
-                                junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
-                            }
-                        } else {
-                            echo "Skipping tests for ${service} as it does not have test folders"
-                            testDetails[service] = [
-                                status: 'SKIPPED',
-                                reason: 'No test folders'
-                            ]
-                        }
-                    }
-                    if (testPasses == 0) {
-                        currentBuild.result = 'FAILURE'
-                    } else if (testFailures > 0) {
-                        currentBuild.result = 'UNSTABLE'
-                    } else {
-                        currentBuild.result = 'SUCCESS'
-                    } 
-                    echo "currentBuild.result: ${currentBuild.result}"
-                    echo "changeService: ${CHANGED_SERVICES}"
+        //                         testDetails[service] = [
+        //                             status: 'SUCCESS',
+        //                             output: testOutput
+        //                         ]
+        //                         testPasses++
+        //                     } catch (Exception e) {
+        //                         echo "Warning: Tests failed for ${service}, but continuing pipeline"
+        //                         testDetails[service] = [
+        //                             status: 'FAILURE',
+        //                             error: e.getMessage()
+        //                         ]
+        //                         testFailures++
+        //                         currentBuild.result = 'UNSTABLE'
+        //                     } finally {
+        //                         // Publish test results regardless of test success/failure
+        //                         junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
+        //                     }
+        //                 } else {
+        //                     echo "Skipping tests for ${service} as it does not have test folders"
+        //                     testDetails[service] = [
+        //                         status: 'SKIPPED',
+        //                         reason: 'No test folders'
+        //                     ]
+        //                 }
+        //             }
+        //             if (testPasses == 0) {
+        //                 currentBuild.result = 'FAILURE'
+        //             } else if (testFailures > 0) {
+        //                 currentBuild.result = 'UNSTABLE'
+        //             } else {
+        //                 currentBuild.result = 'SUCCESS'
+        //             } 
+        //             echo "currentBuild.result: ${currentBuild.result}"
+        //             echo "changeService: ${CHANGED_SERVICES}"
                     
-                    // Store test details for report
-                    env.TEST_SUMMARY = "Tests passed: ${testPasses}, failed: ${testFailures}, skipped: ${serviceList.size() - testPasses - testFailures}"
-                    // Create detailed test report text
-                    def testReportText = "# Test Results Summary\n\n"
-                    testReportText += "| Service | Status | Details |\n"
-                    testReportText += "|---------|--------|--------|\n"
+        //             // Store test details for report
+        //             env.TEST_SUMMARY = "Tests passed: ${testPasses}, failed: ${testFailures}, skipped: ${serviceList.size() - testPasses - testFailures}"
+        //             // Create detailed test report text
+        //             def testReportText = "# Test Results Summary\n\n"
+        //             testReportText += "| Service | Status | Details |\n"
+        //             testReportText += "|---------|--------|--------|\n"
                     
-                    for (service in serviceList) {
-                        def details = testDetails[service]
-                        def statusEmoji = details.status == 'SUCCESS' ? '✅' : details.status == 'SKIPPED' ? '⏭️' : '❌' 
-                        def detailText = details.status == 'SUCCESS' ? 'Tests passed' : 
-                                        details.status == 'SKIPPED' ? details.reason : 'Tests failed'
-                        testReportText += "| ${service} | ${statusEmoji} ${details.status} | ${detailText} |\n"
-                    }
+        //             for (service in serviceList) {
+        //                 def details = testDetails[service]
+        //                 def statusEmoji = details.status == 'SUCCESS' ? '✅' : details.status == 'SKIPPED' ? '⏭️' : '❌' 
+        //                 def detailText = details.status == 'SUCCESS' ? 'Tests passed' : 
+        //                                 details.status == 'SKIPPED' ? details.reason : 'Tests failed'
+        //                 testReportText += "| ${service} | ${statusEmoji} ${details.status} | ${detailText} |\n"
+        //             }
                     
-                    testReportText += "\n\n## JUnit Results\nSee Jenkins test results for detailed JUnit information.\n\n"
-                    testReportText += "## JaCoCo Coverage\nSee Jenkins coverage reports for aggregated code coverage information."
+        //             testReportText += "\n\n## JUnit Results\nSee Jenkins test results for detailed JUnit information.\n\n"
+        //             testReportText += "## JaCoCo Coverage\nSee Jenkins coverage reports for aggregated code coverage information."
                     
-                    env.TEST_REPORT = testReportText
-                }
-                publishChecks name: 'Test Services', status: 'COMPLETED', 
-                    conclusion: currentBuild.result,
-                    summary: env.TEST_SUMMARY,
-                    text: env.TEST_REPORT
-            }
-            post {
-                failure {
-                    publishChecks name: 'Test Services', status: 'COMPLETED', conclusion: 'FAILURE', 
-                        summary: 'Test execution failed'
-                }
-            }
-        }
+        //             env.TEST_REPORT = testReportText
+        //         }
+        //         publishChecks name: 'Test Services', status: 'COMPLETED', 
+        //             conclusion: currentBuild.result,
+        //             summary: env.TEST_SUMMARY,
+        //             text: env.TEST_REPORT
+        //     }
+        //     post {
+        //         failure {
+        //             publishChecks name: 'Test Services', status: 'COMPLETED', conclusion: 'FAILURE', 
+        //                 summary: 'Test execution failed'
+        //         }
+        //     }
+        // }
 
 
         stage('Build and Push Docker Images') {
             // (Stage remains the same, still uses -DskipTests in its helper function)
-            when {
-                // Run if services were changed AND the build is not already a FAILURE
-                // Don't push images if tests failed catastrophically (FAILURE), but DO push if only UNSTABLE
-                expression {
-                    echo "WHEN_CHECK: env.CHANGED_SERVICES = '${env.CHANGED_SERVICES}'" // Log the value it sees
-                    def changedServicesValue = env.CHANGED_SERVICES?.trim()
-                    echo "WHEN_CHECK: trimmed value = '${changedServicesValue}'"       // Log the trimmed value
-                    echo "WHEN_CHECK: Groovy truth of trimmed value = ${!!changedServicesValue}" // Explicitly check Groovy truth (!! converts to boolean)
+            // when {
+            //     // Run if services were changed AND the build is not already a FAILURE
+            //     // Don't push images if tests failed catastrophically (FAILURE), but DO push if only UNSTABLE
+            //     expression {
+            //         echo "WHEN_CHECK: env.CHANGED_SERVICES = '${env.CHANGED_SERVICES}'" // Log the value it sees
+            //         def changedServicesValue = env.CHANGED_SERVICES?.trim()
+            //         echo "WHEN_CHECK: trimmed value = '${changedServicesValue}'"       // Log the trimmed value
+            //         echo "WHEN_CHECK: Groovy truth of trimmed value = ${!!changedServicesValue}" // Explicitly check Groovy truth (!! converts to boolean)
 
-                    echo "WHEN_CHECK: currentBuild.result = '${currentBuild.result}'" // Log the result it sees
-                    def isFailure = currentBuild.result == 'FAILURE'
-                    echo "WHEN_CHECK: isFailure = ${isFailure}"
+            //         echo "WHEN_CHECK: currentBuild.result = '${currentBuild.result}'" // Log the result it sees
+            //         def isFailure = currentBuild.result == 'FAILURE'
+            //         echo "WHEN_CHECK: isFailure = ${isFailure}"
 
-                    def finalResult = changedServicesValue && !isFailure // Use the trimmed value directly
-                    echo "WHEN_CHECK: final calculated result = ${finalResult}"
+            //         def finalResult = changedServicesValue && !isFailure // Use the trimmed value directly
+            //         echo "WHEN_CHECK: final calculated result = ${finalResult}"
 
-                    return finalResult
-                }
-            }
+            //         return finalResult
+            //     }
+            // }
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: env.DOCKER_HUB_CREDS_ID,
