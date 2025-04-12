@@ -189,6 +189,8 @@ pipeline {
                     testReportText += "## JaCoCo Coverage\nSee Jenkins coverage reports for aggregated code coverage information."
                     
                     env.TEST_REPORT = testReportText
+                    echo "currentBuild.result: ${currentBuild.result}"
+                    echo "changedServices: ${env.CHANGED_SERVICES}"
                 }
                 publishChecks name: 'Test Services', status: 'COMPLETED', 
                     conclusion: currentBuild.result == 'UNSTABLE' ? 'NEUTRAL' : 'SUCCESS',
@@ -206,7 +208,7 @@ pipeline {
 
         stage('Build and Push Docker Images') {
             // (Stage remains the same, still uses -DskipTests in its helper function)
-             when {
+            when {
                 // Run if services were changed AND the build is not already a FAILURE
                 // Don't push images if tests failed catastrophically (FAILURE), but DO push if only UNSTABLE
                 expression { return env.CHANGED_SERVICES?.trim() && currentBuild.result != 'FAILURE' }
