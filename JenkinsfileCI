@@ -44,19 +44,10 @@ pipeline {
     }
     environment {
         WORKSPACE = "${env.WORKSPACE}"
-        // List of services without test folders
-        SERVICES_WITHOUT_TESTS = "spring-petclinic-admin-server spring-petclinic-genai-service" // Added back
+        // List of services without test folders       
+        SERVICES_WITHOUT_TESTS = "spring-petclinic-admin-server spring-petclinic-genai-service"
         // Full list of services
         ALL_SERVICES = "spring-petclinic-admin-server spring-petclinic-api-gateway spring-petclinic-config-server spring-petclinic-customers-service spring-petclinic-discovery-server spring-petclinic-genai-service spring-petclinic-vets-service spring-petclinic-visits-service"
-        // Docker Hub credentials ID
-        DOCKER_HUB_CREDS_ID = 'docker-hub-credentials'
-        // Variables populated by stages
-        CHANGED_SERVICES = ''
-        CHANGED_FILES = ''
-        COMMIT_ID = ''
-        // Variables for test reporting
-        TEST_SUMMARY = '' // Added back
-        TEST_REPORT = ''  // Added back
     }
     stages {
         stage('Detect Branch and Changes') {
@@ -88,7 +79,7 @@ pipeline {
                             if (changedFiles.contains("pom.xml") || 
                                 changedFiles.contains(".github") || 
                                 changedFiles.contains("docker-compose") ||
-                                changedFiles.contains("JenkinsfileCI")) {
+                                changedFiles.contains("Jenkinsfile")) {
                                 echo "Common files changed, will build all services"
                                 env.CHANGED_SERVICES = env.ALL_SERVICES
                             } else {
