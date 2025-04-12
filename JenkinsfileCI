@@ -117,114 +117,91 @@ pipeline {
             }
         }
 
-        // <<-- TEST STAGE ADDED BACK (without JaCoCo) -->>
         stage('Test Services') {
             when {
-                // Only run if services were changed
-                expression { return env.CHANGED_SERVICES?.trim() }
+                expression { return env.CHANGED_SERVICES != "" }
             }
             steps {
-                // Initial status check for this stage
-                 publishChecks name: 'Test Services', status: 'IN_PROGRESS',
-                     summary: 'Running tests for changed services...',
-                     text: "Starting tests for:\n```\n${env.CHANGED_SERVICES}\n```"
-
+                publishChecks name: 'Test Services', status: 'IN_PROGRESS', 
+                    summary: 'Running tests for changed services'
                 script {
                     def serviceList = env.CHANGED_SERVICES.trim().split(" ")
-                    def testDetails = [:] // Store results per service
+                    def testDetails = [:]
                     def testFailures = 0
                     def testPasses = 0
-                    def testSkipped = 0 // Count explicitly skipped services
+                    
 
-                    // Run tests sequentially (can be parallelized if needed, but often simpler sequentially)
                     for (service in serviceList) {
-                        echo "Processing tests for service: ${service}"
-
-                        // Check if the service is in the exclusion list
+                        echo "Running tests for service: ${service}"
+                        echo "Testing service: ${service}"
+                        // Check if the service has tests
                         if (!env.SERVICES_WITHOUT_TESTS.contains(service)) {
-                            echo "Running tests for ${service}"
                             try {
-                                // Execute Maven verify goal which includes tests
-                                // Use returnStatus: true if you want to capture exit code instead of throwing exception on failure
-                                sh(script: "./mvnw clean verify -pl ${service}") // No stdout needed here directly
+                                def testOutput = sh(script: "./mvnw clean verify -pl ${service}", returnStdout: true)
 
-                                echo "Tests passed for ${service}"
-                                testDetails[service] = [ status: 'SUCCESS' ]
+                                // def testOutput = sh(script: 'mvn clean test -Djdk.attach.allowAttachSelf=true', returnStdout: true)
+
+                                testDetails[service] = [
+                                    status: 'SUCCESS',
+                                    output: testOutput
+                                ]
                                 testPasses++
                             } catch (Exception e) {
-                                echo "WARNING: Tests failed for ${service}. Marking build as UNSTABLE."
-                                testDetails[service] = [ status: 'FAILURE', error: e.getMessage() ]
+                                echo "Warning: Tests failed for ${service}, but continuing pipeline"
+                                testDetails[service] = [
+                                    status: 'FAILURE',
+                                    error: e.getMessage()
+                                ]
                                 testFailures++
-                                // Set build to UNSTABLE, but allow pipeline to continue
                                 currentBuild.result = 'UNSTABLE'
                             } finally {
-                                // Always try to publish JUnit results if tests were attempted
-                                echo "Publishing JUnit results for ${service}"
-                                junit allowEmptyResults: true, testResults: "${service}/target/surefire-reports/*.xml"
+                                // Publish test results regardless of test success/failure
+                                junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
                             }
                         } else {
-                            echo "Skipping tests for ${service} (listed in SERVICES_WITHOUT_TESTS)"
-                            testDetails[service] = [ status: 'SKIPPED', reason: 'Explicitly skipped (no tests)' ]
-                            testSkipped++
+                            echo "Skipping tests for ${service} as it does not have test folders"
+                            testDetails[service] = [
+                                status: 'SKIPPED',
+                                reason: 'No test folders'
+                            ]
                         }
-                    } // end for loop
-
-                    // Prepare summary and detailed report text
-                    env.TEST_SUMMARY = "Tests completed - Passed: ${testPasses}, Failed: ${testFailures}, Skipped: ${testSkipped}"
-
-                    def testReportText = "## Test Results Summary\n\n"
-                    testReportText += "**Overall:** ${env.TEST_SUMMARY}\n\n"
+                    }
+                    echo "outside of loop"
+                    
+                    
+                    // Store test details for report
+                    env.TEST_SUMMARY = "Tests passed: ${testPasses}, failed: ${testFailures}, skipped: ${serviceList.size() - testPasses - testFailures}"
+                    
+                    // Create detailed test report text
+                    def testReportText = "# Test Results Summary\n\n"
                     testReportText += "| Service | Status | Details |\n"
-                    testReportText += "|---------|--------|---------|\n"
-
+                    testReportText += "|---------|--------|--------|\n"
+                    
                     for (service in serviceList) {
                         def details = testDetails[service]
-                        if (details) { // Check if details exist (should always unless error before loop)
-                            def statusEmoji = details.status == 'SUCCESS' ? '✅' : details.status == 'SKIPPED' ? '⏭️' : '❌'
-                            def detailText = details.status == 'SUCCESS' ? 'Tests passed' :
-                                            details.status == 'SKIPPED' ? details.reason : "Tests failed" // Simplified detail
-                            testReportText += "| ${service} | ${statusEmoji} ${details.status} | ${detailText} |\n"
-                        } else {
-                            testReportText += "| ${service} | ❔ UNKNOWN | Processing error | \n" // Fallback
-                        }
+                        def statusEmoji = details.status == 'SUCCESS' ? '✅' : details.status == 'SKIPPED' ? '⏭️' : '❌' 
+                        def detailText = details.status == 'SUCCESS' ? 'Tests passed' : 
+                                        details.status == 'SKIPPED' ? details.reason : 'Tests failed'
+                        testReportText += "| ${service} | ${statusEmoji} ${details.status} | ${detailText} |\n"
                     }
-
-                    testReportText += "\n\nSee Jenkins test results UI for detailed JUnit reports."
+                    
+                    testReportText += "\n\n## JUnit Results\nSee Jenkins test results for detailed JUnit information.\n\n"
+                    testReportText += "## JaCoCo Coverage\nSee Jenkins coverage reports for aggregated code coverage information."
+                    
                     env.TEST_REPORT = testReportText
-
-                    // Determine final conclusion for the check based on build status
-                    def finalConclusion = 'SUCCESS'
-                    if (currentBuild.result == 'UNSTABLE') {
-                        finalConclusion = 'NEUTRAL' // Use NEUTRAL for GitHub Checks when tests fail but build continues
-                    } else if (currentBuild.result == 'FAILURE') {
-                         finalConclusion = 'FAILURE' // If something else caused failure
-                    }
-
-                     // Final status check for this stage, using the helper function
-                     publishBuildStatus(checkName: 'Test Services',
-                                        conclusion: finalConclusion,
-                                        summary: env.TEST_SUMMARY,
-                                        details: env.TEST_REPORT)
-
-                } // end script
-            } // end steps
-            post {
-                // This catches failures *within* the stage steps execution itself (e.g., script error),
-                // not just test failures which are handled by setting UNSTABLE.
-                failure {
-                     publishBuildStatus(checkName: 'Test Services',
-                                        conclusion: 'FAILURE',
-                                        summary: 'Test stage execution failed catastrophically.',
-                                        details: """## Test Stage Failed
-                                        A critical error occurred during the test execution stage, preventing completion.
-                                        Check the Jenkins console logs for errors.
-                                        Attempted services:
-                                        ```
-                                        ${env.CHANGED_SERVICES ?: 'N/A'}
-                                        ```""")
                 }
-            } // end post
-        } // end stage 'Test Services'
+                publishChecks name: 'Test Services', status: 'COMPLETED', 
+                    conclusion: currentBuild.result == 'UNSTABLE' ? 'NEUTRAL' : 'SUCCESS',
+                    summary: env.TEST_SUMMARY,
+                    text: env.TEST_REPORT
+            }
+            post {
+                failure {
+                    publishChecks name: 'Test Services', status: 'COMPLETED', conclusion: 'FAILURE', 
+                        summary: 'Test execution failed'
+                }
+            }
+        }
 
 
         stage('Build and Push Docker Images') {
