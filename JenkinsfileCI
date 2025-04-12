@@ -1,0 +1,340 @@
+// ============================================
+// Helper Functions
+// ============================================
+
+/**
+ * Detects which services have changed based on the branch and git diff.
+ * (Implementation remains the same)
+ */
+def detectChangedServices(String branchName, String allServices) {
+    echo "Detecting changes for Branch: ${branchName}"
+    def result = [changedServices: '', changedFiles: '']
+
+    if (branchName == 'main') {
+        echo "This is the main branch - will build all services"
+        result.changedServices = allServices
+        result.changedFiles = "N/A (main branch build)"
+    } else {
+        def changedFilesOutput = sh(script: "git diff --name-only HEAD~1 HEAD", returnStdout: true).trim()
+        result.changedFiles = changedFilesOutput
+        echo "Changed files detected:\n${result.changedFiles}"
+
+        def servicesList = allServices.split(" ")
+        def servicesToBuild = []
+
+        for (service in servicesList) {
+            if (result.changedFiles.contains("${service}/")) {
+                servicesToBuild.add(service)
+            }
+        }
+        result.changedServices = servicesToBuild.join(" ")
+
+        if (result.changedServices.trim() == "") {
+            if (result.changedFiles.contains("pom.xml") ||
+                result.changedFiles.contains(".github/") ||
+                result.changedFiles.contains("docker-compose") ||
+                result.changedFiles.contains("Jenkinsfile")) {
+                echo "Common files changed, will build all services"
+                result.changedServices = allServices
+            } else {
+                echo "No relevant service or common file changes detected"
+            }
+        }
+    }
+    echo "Services to build: ${result.changedServices ?: 'None'}"
+    return result
+}
+
+/**
+ * Builds the Maven project for a service and builds/pushes its Docker image.
+ * Tests are skipped here (-DskipTests) as they run in the dedicated Test stage.
+ * (Implementation remains the same)
+ */
+def buildAndPushDockerImage(String service, String commitId, String dockerUsername) {
+    echo "Building Docker image for ${service} (skipping tests)"
+    // Tests are skipped here because they run in the 'Test Services' stage
+    sh "./mvnw clean install -PbuildDocker -pl ${service} -DskipTests"
+    def baseImageName = "${dockerUsername}/${service}"
+    def latestTag = "${baseImageName}:latest"
+    def commitTag = "${baseImageName}:${commitId}"
+    echo "Tagging ${latestTag} as ${commitTag}"
+    sh "docker tag ${latestTag} ${commitTag}"
+    echo "Pushing ${commitTag} to Docker Hub"
+    sh "docker push ${commitTag}"
+    // Optional: sh "docker push ${latestTag}"
+}
+
+/**
+ * Publishes a build status check.
+ * (Implementation remains the same)
+ */
+def publishBuildStatus(String checkName, String conclusion, String summary, String details) {
+    echo "Publishing check: Name='${checkName}', Conclusion='${conclusion}'"
+    publishChecks name: checkName,
+                  status: 'COMPLETED',
+                  conclusion: conclusion,
+                  summary: summary,
+                  text: details
+}
+
+
+// ============================================
+// Pipeline Definition
+// ============================================
+pipeline {
+    agent any
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '5'))
+        timestamps()
+    }
+    environment {
+        WORKSPACE = "${env.WORKSPACE}"
+        // List of services without test folders
+        SERVICES_WITHOUT_TESTS = "spring-petclinic-admin-server spring-petclinic-genai-service" // Added back
+        // Full list of services
+        ALL_SERVICES = "spring-petclinic-admin-server spring-petclinic-api-gateway spring-petclinic-config-server spring-petclinic-customers-service spring-petclinic-discovery-server spring-petclinic-genai-service spring-petclinic-vets-service spring-petclinic-visits-service"
+        // Docker Hub credentials ID
+        DOCKER_HUB_CREDS_ID = 'docker-hub-credentials'
+        // Variables populated by stages
+        CHANGED_SERVICES = ''
+        CHANGED_FILES = ''
+        COMMIT_ID = ''
+        // Variables for test reporting
+        TEST_SUMMARY = '' // Added back
+        TEST_REPORT = ''  // Added back
+    }
+    stages {
+        stage('Detect Branch and Changes') {
+            // (Stage remains the same as previous version)
+            steps {
+                script {
+                    def changes = detectChangedServices(env.BRANCH_NAME ?: 'main', env.ALL_SERVICES)
+                    env.CHANGED_SERVICES = changes.changedServices
+                    env.CHANGED_FILES = changes.changedFiles
+
+                    if (env.CHANGED_SERVICES?.trim()) {
+                       env.COMMIT_ID = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+                       echo "Commit ID for Docker tags: ${env.COMMIT_ID}"
+                    } else {
+                       echo "No services to build, skipping commit ID retrieval."
+                       env.COMMIT_ID = "N/A"
+                    }
+
+                    def summaryText = env.BRANCH_NAME == 'main' ?
+                        "Building all services on main branch" :
+                        "Changed files detected: ${env.CHANGED_FILES?.split('\n')?.size() ?: 0}"
+                    def detailsText = env.BRANCH_NAME == 'main' ?
+                        """## Main Branch Build
+                        Building all services because this is the main branch.""" :
+                        """## Changed Files Analysis
+                        **Branch:** ${env.BRANCH_NAME}
+                        ### Changed Files (${env.CHANGED_FILES?.split('\n')?.size() ?: 0}):
+                        ```
+                        ${env.CHANGED_FILES ?: 'No changes detected'}
+                        ```
+                        ---
+                        ### Services to Build/Test:
+                        ```
+                        ${env.CHANGED_SERVICES ?: 'No services targeted'}
+                        ```""" // Updated text slightly
+
+                    publishBuildStatus(checkName: 'Detect Changes', conclusion: 'SUCCESS', summary: summaryText, details: detailsText)
+                }
+            }
+            post {
+                failure {
+                    publishBuildStatus(checkName: 'Detect Changes',
+                                       conclusion: 'FAILURE',
+                                       summary: 'Failed to detect changes or get commit ID.',
+                                       details: """## Detect Changes Failed
+                                       An error occurred during the change detection stage. Check console output.
+                                       **Branch:** ${env.BRANCH_NAME ?: 'Unknown'}""")
+                }
+            }
+        }
+
+        // <<-- TEST STAGE ADDED BACK (without JaCoCo) -->>
+        stage('Test Services') {
+            when {
+                // Only run if services were changed
+                expression { return env.CHANGED_SERVICES?.trim() }
+            }
+            steps {
+                // Initial status check for this stage
+                 publishChecks name: 'Test Services', status: 'IN_PROGRESS',
+                     summary: 'Running tests for changed services...',
+                     text: "Starting tests for:\n```\n${env.CHANGED_SERVICES}\n```"
+
+                script {
+                    def serviceList = env.CHANGED_SERVICES.trim().split(" ")
+                    def testDetails = [:] // Store results per service
+                    def testFailures = 0
+                    def testPasses = 0
+                    def testSkipped = 0 // Count explicitly skipped services
+
+                    // Run tests sequentially (can be parallelized if needed, but often simpler sequentially)
+                    for (service in serviceList) {
+                        echo "Processing tests for service: ${service}"
+
+                        // Check if the service is in the exclusion list
+                        if (!env.SERVICES_WITHOUT_TESTS.contains(service)) {
+                            echo "Running tests for ${service}"
+                            try {
+                                // Execute Maven verify goal which includes tests
+                                // Use returnStatus: true if you want to capture exit code instead of throwing exception on failure
+                                sh(script: "./mvnw clean verify -pl ${service}") // No stdout needed here directly
+
+                                echo "Tests passed for ${service}"
+                                testDetails[service] = [ status: 'SUCCESS' ]
+                                testPasses++
+                            } catch (Exception e) {
+                                echo "WARNING: Tests failed for ${service}. Marking build as UNSTABLE."
+                                testDetails[service] = [ status: 'FAILURE', error: e.getMessage() ]
+                                testFailures++
+                                // Set build to UNSTABLE, but allow pipeline to continue
+                                currentBuild.result = 'UNSTABLE'
+                            } finally {
+                                // Always try to publish JUnit results if tests were attempted
+                                echo "Publishing JUnit results for ${service}"
+                                junit allowEmptyResults: true, testResults: "${service}/target/surefire-reports/*.xml"
+                            }
+                        } else {
+                            echo "Skipping tests for ${service} (listed in SERVICES_WITHOUT_TESTS)"
+                            testDetails[service] = [ status: 'SKIPPED', reason: 'Explicitly skipped (no tests)' ]
+                            testSkipped++
+                        }
+                    } // end for loop
+
+                    // Prepare summary and detailed report text
+                    env.TEST_SUMMARY = "Tests completed - Passed: ${testPasses}, Failed: ${testFailures}, Skipped: ${testSkipped}"
+
+                    def testReportText = "## Test Results Summary\n\n"
+                    testReportText += "**Overall:** ${env.TEST_SUMMARY}\n\n"
+                    testReportText += "| Service | Status | Details |\n"
+                    testReportText += "|---------|--------|---------|\n"
+
+                    for (service in serviceList) {
+                        def details = testDetails[service]
+                        if (details) { // Check if details exist (should always unless error before loop)
+                            def statusEmoji = details.status == 'SUCCESS' ? '✅' : details.status == 'SKIPPED' ? '⏭️' : '❌'
+                            def detailText = details.status == 'SUCCESS' ? 'Tests passed' :
+                                            details.status == 'SKIPPED' ? details.reason : "Tests failed" // Simplified detail
+                            testReportText += "| ${service} | ${statusEmoji} ${details.status} | ${detailText} |\n"
+                        } else {
+                            testReportText += "| ${service} | ❔ UNKNOWN | Processing error | \n" // Fallback
+                        }
+                    }
+
+                    testReportText += "\n\nSee Jenkins test results UI for detailed JUnit reports."
+                    env.TEST_REPORT = testReportText
+
+                    // Determine final conclusion for the check based on build status
+                    def finalConclusion = 'SUCCESS'
+                    if (currentBuild.result == 'UNSTABLE') {
+                        finalConclusion = 'NEUTRAL' // Use NEUTRAL for GitHub Checks when tests fail but build continues
+                    } else if (currentBuild.result == 'FAILURE') {
+                         finalConclusion = 'FAILURE' // If something else caused failure
+                    }
+
+                     // Final status check for this stage, using the helper function
+                     publishBuildStatus(checkName: 'Test Services',
+                                        conclusion: finalConclusion,
+                                        summary: env.TEST_SUMMARY,
+                                        details: env.TEST_REPORT)
+
+                } // end script
+            } // end steps
+            post {
+                // This catches failures *within* the stage steps execution itself (e.g., script error),
+                // not just test failures which are handled by setting UNSTABLE.
+                failure {
+                     publishBuildStatus(checkName: 'Test Services',
+                                        conclusion: 'FAILURE',
+                                        summary: 'Test stage execution failed catastrophically.',
+                                        details: """## Test Stage Failed
+                                        A critical error occurred during the test execution stage, preventing completion.
+                                        Check the Jenkins console logs for errors.
+                                        Attempted services:
+                                        ```
+                                        ${env.CHANGED_SERVICES ?: 'N/A'}
+                                        ```""")
+                }
+            } // end post
+        } // end stage 'Test Services'
+
+
+        stage('Build and Push Docker Images') {
+            // (Stage remains the same, still uses -DskipTests in its helper function)
+             when {
+                // Run if services were changed AND the build is not already a FAILURE
+                // Don't push images if tests failed catastrophically (FAILURE), but DO push if only UNSTABLE
+                expression { return env.CHANGED_SERVICES?.trim() && currentBuild.result != 'FAILURE' }
+            }
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: env.DOCKER_HUB_CREDS_ID,
+                                                    usernameVariable: 'DOCKER_USERNAME',
+                                                    passwordVariable: 'DOCKER_PASSWORD')]) {
+                        echo "Logging into Docker Hub as ${DOCKER_USERNAME}"
+                        sh "echo \$DOCKER_PASSWORD | docker login -u \$DOCKER_USERNAME --password-stdin"
+
+                        def servicesToBuild = env.CHANGED_SERVICES.trim().split(" ")
+                        for (service in servicesToBuild) {
+                            buildAndPushDockerImage(service, env.COMMIT_ID, DOCKER_USERNAME)
+                        }
+                    }
+                }
+            }
+            post {
+                success {
+                    def successSummary = "Successfully built & pushed images for ${env.CHANGED_SERVICES.trim().split(' ').size()} service(s)."
+                    def successDetails = """## Build & Push Successful
+                        **Commit:** ${env.COMMIT_ID}
+                        **Services Processed:**
+                        ```
+                        ${env.CHANGED_SERVICES}
+                        ```"""
+                    publishBuildStatus(checkName: 'Build & Push Images', conclusion: 'SUCCESS', summary: successSummary, details: successDetails)
+                }
+                failure {
+                    echo "Failed to build or push Docker images."
+                    def failureSummary = 'Failed during Docker build or push stage.'
+                    def failureDetails = """## Build & Push Failed
+                    An error occurred while building or pushing Docker images. Check the console output for details.
+                    **Commit:** ${env.COMMIT_ID ?: 'N/A'}
+                    **Services attempted:**
+                    ```
+                    ${env.CHANGED_SERVICES ?: 'N/A'}
+                    ```"""
+                    publishBuildStatus(checkName: 'Build & Push Images', conclusion: 'FAILURE', summary: failureSummary, details: failureDetails)
+                }
+                always {
+                    script {
+                        echo "Logging out from Docker Hub"
+                        sh script: 'docker logout', returnStatus: true
+                    }
+                }
+            }
+        }
+
+
+        stage('Clean Workspace') {
+            // (Stage remains the same)
+            steps {
+                echo 'Cleaning workspace...'
+                deleteDir()
+            }
+        }
+    }
+    post {
+        // (Post block remains the same)
+        always {
+            echo "Pipeline finished with status: ${currentBuild.currentResult}"
+            // Optional: Add a final overall status check here if needed
+             publishBuildStatus(checkName: 'Overall Pipeline Status',
+                                conclusion: (currentBuild.result == 'SUCCESS' || currentBuild.result == 'UNSTABLE') ? 'SUCCESS' : 'FAILURE', // Map UNSTABLE to SUCCESS for the final check if desired
+                                summary: "Pipeline finished: ${currentBuild.currentResult}",
+                                details: "The overall pipeline status is ${currentBuild.currentResult}.")
+        }
+    }
+}
