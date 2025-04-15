@@ -11,7 +11,7 @@ pipeline {
     }
     environment {
         WORKSPACE = "${env.WORKSPACE}"
-        // List of services without test folders       
+        // List of services without test folders           
         SERVICES_WITHOUT_TESTS = "spring-petclinic-admin-server spring-petclinic-genai-service"
         // Full list of services
         ALL_SERVICES = "spring-petclinic-admin-server spring-petclinic-api-gateway spring-petclinic-config-server spring-petclinic-customers-service spring-petclinic-discovery-server spring-petclinic-genai-service spring-petclinic-vets-service spring-petclinic-visits-service"
