@@ -1,0 +1,61 @@
+pipeline {
+    agent any
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '5'))
+    }
+    parameters {
+        string(name: 'CUSTOMERS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for customers-service')
+        string(name: 'VISITS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for visits-service')
+        string(name: 'VETS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for vets-service')
+        string(name: 'GENAI_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for genai-service')
+    }
+    environment {
+        WORKSPACE = "${env.WORKSPACE}"
+        // List of services without test folders       
+        SERVICES_WITHOUT_TESTS = "spring-petclinic-admin-server spring-petclinic-genai-service"
+        // Full list of services
+        ALL_SERVICES = "spring-petclinic-admin-server spring-petclinic-api-gateway spring-petclinic-config-server spring-petclinic-customers-service spring-petclinic-discovery-server spring-petclinic-genai-service spring-petclinic-vets-service spring-petclinic-visits-service"
+    }
+    stages {
+        stage('Check out Branch not Main and take out latest commitID') {
+            steps {
+                script {
+                    def commitIDs = [:]
+                    
+                    // Check branches and get commit IDs for non-main branches
+                    if (params.CUSTOMERS_SERVICE_BRANCH != 'main') {
+                        commitIDs['customers-service'] = checkoutBranchAndGetCommitID('spring-petclinic-customers-service', params.CUSTOMERS_SERVICE_BRANCH)
+                    }
+                    
+                    if (params.VISITS_SERVICE_BRANCH != 'main') {
+                        commitIDs['visits-service'] = checkoutBranchAndGetCommitID('spring-petclinic-visits-service', params.VISITS_SERVICE_BRANCH)
+                    }
+                    
+                    if (params.VETS_SERVICE_BRANCH != 'main') {
+                        commitIDs['vets-service'] = checkoutBranchAndGetCommitID('spring-petclinic-vets-service', params.VETS_SERVICE_BRANCH)
+                    }
+                    
+                    if (params.GENAI_SERVICE_BRANCH != 'main') {
+                        commitIDs['genai-service'] = checkoutBranchAndGetCommitID('spring-petclinic-genai-service', params.GENAI_SERVICE_BRANCH)
+                    }
+                    
+                    // Store the commit IDs as environment variables for use in later stages
+                    commitIDs.each { service, commitID ->
+                        env."${service.toUpperCase().replace('-', '_')}_COMMIT_ID" = commitID
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Function to checkout a branch and get its commit ID
+def checkoutBranchAndGetCommitID(String servicePath, String branchName) {
+    dir(servicePath) {
+        checkout scm
+        sh "git checkout ${branchName}"
+        def commitID = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+        echo "Checked out ${servicePath} branch ${branchName} with commit ID: ${commitID}"
+        return commitID
+    }
+}
