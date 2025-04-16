@@ -20,7 +20,10 @@ pipeline {
         stage('Check out Branch not Main and take out latest commitID') {
             steps {
                 script {
-
+                    echo  "customers-service branch: ${params.CUSTOMERS_SERVICE_BRANCH}"
+                    echo  "visits-service branch: ${params.VISITS_SERVICE_BRANCH}"
+                    echo  "vets-service branch: ${params.VETS_SERVICE_BRANCH}"
+                    echo  "genai-service branch: ${params.GENAI_SERVICE_BRANCH}"
                     
                     // Check branches and get commit IDs for non-main branches
                     if (params.CUSTOMERS_SERVICE_BRANCH != 'main') {
