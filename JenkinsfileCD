@@ -67,6 +67,7 @@ pipeline {
 
 // Function to checkout a branch and get its commit ID
 def checkoutBranchAndGetCommitID(String servicePath, String branchName) {
+    echo "Checking out ${servicePath} branch ${branchName}"
     dir(servicePath) {
         checkout scm
         // sh "git checkout ${branchName}"
