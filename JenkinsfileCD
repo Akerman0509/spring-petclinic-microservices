@@ -78,7 +78,7 @@ def checkoutBranchAndGetCommitID(String servicePath, String branchName) {
         sh """
             git fetch origin
             git checkout ${branchName}
-            git reset --hard origin/${branch}
+            git reset --hard origin/${branchName}
         """
         def commitID = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
         echo "Checked out ${servicePath} branch ${branchName} with commit ID: ${commitID}"
