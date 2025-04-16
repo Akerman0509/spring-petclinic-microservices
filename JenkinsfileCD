@@ -44,7 +44,7 @@ pipeline {
                         commitIDs['spring-petclinic-genai-service'] = checkoutBranchAndGetCommitID('spring-petclinic-genai-service', params.GENAI_SERVICE_BRANCH)
                     }
                     
-                    echo "Commit IDs: ${env.commitIDs}"
+                    echo "Commit IDs: ${commitIDs}"
                 }
             }
         }
@@ -80,7 +80,6 @@ def checkoutBranchAndGetCommitID(String servicePath, String branchName) {
         sh """
             git fetch origin
             git checkout ${branchName}
-            git reset --hard origin/${branchName}
         """
         def commitID = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
         echo "Checked out ${servicePath} branch ${branchName} with commit ID: ${commitID}"
