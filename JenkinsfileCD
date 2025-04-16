@@ -55,6 +55,13 @@ pipeline {
                 }
             }
         }
+
+        stage('Clean') {
+            steps {
+                echo 'Cleaning workspace and build artifacts...'
+                deleteDir() 
+            }
+        }
     }
 }
 
@@ -62,7 +69,13 @@ pipeline {
 def checkoutBranchAndGetCommitID(String servicePath, String branchName) {
     dir(servicePath) {
         checkout scm
-        sh "git checkout ${branchName}"
+        // sh "git checkout ${branchName}"
+
+        sh """
+            git fetch origin
+            git checkout ${branch}
+            git reset --hard origin/${branch}
+        """
         def commitID = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
         echo "Checked out ${servicePath} branch ${branchName} with commit ID: ${commitID}"
         return commitID
