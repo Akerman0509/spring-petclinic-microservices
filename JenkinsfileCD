@@ -1,3 +1,5 @@
+def commitIDs = [:]
+
 pipeline {
     agent any
     options {
@@ -27,19 +29,19 @@ pipeline {
                     
                     // Check branches and get commit IDs for non-main branches
                     if (params.CUSTOMERS_SERVICE_BRANCH != 'main') {
-                        env.commitIDs['spring-petclinic-customers-service'] = checkoutBranchAndGetCommitID('spring-petclinic-customers-service', params.CUSTOMERS_SERVICE_BRANCH)
+                        commitIDs['spring-petclinic-customers-service'] = checkoutBranchAndGetCommitID('spring-petclinic-customers-service', params.CUSTOMERS_SERVICE_BRANCH)
                     }
                     
                     if (params.VISITS_SERVICE_BRANCH != 'main') {
-                        env.commitIDs['spring-petclinic-visits-service'] = checkoutBranchAndGetCommitID('spring-petclinic-visits-service', params.VISITS_SERVICE_BRANCH)
+                        commitIDs['spring-petclinic-visits-service'] = checkoutBranchAndGetCommitID('spring-petclinic-visits-service', params.VISITS_SERVICE_BRANCH)
                     }
                     
                     if (params.VETS_SERVICE_BRANCH != 'main') {
-                        env.commitIDs['spring-petclinic-vets-service'] = checkoutBranchAndGetCommitID('spring-petclinic-vets-service', params.VETS_SERVICE_BRANCH)
+                        commitIDs['spring-petclinic-vets-service'] = checkoutBranchAndGetCommitID('spring-petclinic-vets-service', params.VETS_SERVICE_BRANCH)
                     }
                     
                     if (params.GENAI_SERVICE_BRANCH != 'main') {
-                        env.commitIDs['spring-petclinic-genai-service'] = checkoutBranchAndGetCommitID('spring-petclinic-genai-service', params.GENAI_SERVICE_BRANCH)
+                        commitIDs['spring-petclinic-genai-service'] = checkoutBranchAndGetCommitID('spring-petclinic-genai-service', params.GENAI_SERVICE_BRANCH)
                     }
                     
                     echo "Commit IDs: ${env.commitIDs}"
@@ -51,7 +53,7 @@ pipeline {
             steps{
                 script {
                     // Loop through commitIDs map and update Helm for each service
-                    env.commitIDs.each { service, commitID ->
+                    commitIDs.each { service, commitID ->
                         echo "Updating Helm for ${service} with commit ID ${commitID}"
                         updateHelm("akerman0509", service, commitID)
                     }
