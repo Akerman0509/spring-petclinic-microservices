@@ -106,10 +106,10 @@ def updateHelm(String docker_user, String service, String commitID){
     echo "namespace: ${namespace}"
     echo "imageName: ${imageName}"
     echo "commitID: ${commitID}"
-    // sh """
-    //     helm upgrade --install --namespace=${namespace} --create-namespace ${service}-${commitID} -f ${helmValues} ${helmChart} \
-    //     --set image.repository=${imageName} \
-    //     --set image.tag=${commitID}
-    // """
+    sh """
+        helm upgrade --install --namespace=${namespace} --create-namespace ${service}-${commitID} -f ${helmValues} ${helmChart} \
+        --set image.repository=${imageName} \
+        --set image.tag=${commitID}
+    """
 
 }
