@@ -110,7 +110,12 @@ def updateHelm(String docker_user, String service, String commitID){
 
     // Use Jenkins credentials
     withCredentials([usernamePassword(credentialsId: 'GITHUB-18-4', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
-
+        // Clear any cached Git credentials
+        sh '''
+            git config --global --unset credential.helper || true
+            git credential-cache exit || true
+            rm -f ~/.git-credentials || true
+        '''
         // Clone GitOps repo with credentials
         sh """
             git clone https://${GIT_USER}:${GIT_PASS}@${gitOpsRepo} ${gitOpsDir}
