@@ -13,7 +13,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: new-app-spring
+    namespace: new-app-spring2
 
   syncPolicy:
     automated:

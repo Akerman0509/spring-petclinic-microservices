@@ -1,0 +1,43 @@
+# PetClinic values for dev environment
+services:
+  - name: customers-service
+    image: akerman0509/spring-petclinic-customers-service:42a1f58
+    port: 8081
+  - name: visits-service
+    image: akerman0509/spring-petclinic-visits-service:42a1f58
+    port: 8084
+  - name: vets-service
+    image: akerman0509/spring-petclinic-vets-service:42a1f58
+    port: 8083
+  - name: genai-service
+    image: akerman0509/spring-petclinic-genai-service:42a1f58
+    port: 8082
+  - name: admin-server
+    image: akerman0509/spring-petclinic-admin-server:42a1f58
+    port: 9100
+  - name: config-server
+    image: akerman0509/spring-petclinic-config-server:42a1f58
+    port: 8888
+  - name: api-gateway
+    image: akerman0509/spring-petclinic-api-gateway:42a1f58
+    port: 8080
+  - name: discovery-server
+    image: akerman0509/spring-petclinic-discovery-server:42a1f58
+    port: 8761
+
+service:
+  type: NodePort
+  nodePort: 30080
+
+serviceAccount:
+  create: true
+  name: ""
+
+ingress:
+  enabled: false
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80

@@ -1,115 +1,171 @@
-def commitIDs = [:]
-
 pipeline {
     agent any
-    options {
-        buildDiscarder(logRotator(numToKeepStr: '5'))
-    }
+
     parameters {
-        string(name: 'CUSTOMERS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for customers-service')
-        string(name: 'VISITS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for visits-service')
-        string(name: 'VETS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for vets-service')
-        string(name: 'GENAI_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for genai-service')
+        string(name: 'BRANCH_CUSTOMERS', defaultValue: 'main', description: 'Branch for customers-service')
+        string(name: 'BRANCH_VISITS', defaultValue: 'main', description: 'Branch for visits-service')
+        string(name: 'BRANCH_VETS', defaultValue: 'main', description: 'Branch for vets-service')
+        string(name: 'BRANCH_GENAI', defaultValue: 'main', description: 'Branch for genai-service')
+        string(name: 'BRANCH_ADMIN', defaultValue: 'main', description: 'Branch for admin-server')
+        string(name: 'BRANCH_CONFIG', defaultValue: 'main', description: 'Branch for config-server')
+        string(name: 'BRANCH_GATEWAY', defaultValue: 'main', description: 'Branch for api-gateway')
+        string(name: 'BRANCH_DISCOVERY', defaultValue: 'main', description: 'Branch for discovery-server')
+        string(name: 'ENVIRONMENT', defaultValue: 'dev', description: 'Environment to deploy to (dev or staging)')
     }
+
     environment {
-        WORKSPACE = "${env.WORKSPACE}"
-        // List of services without test folders       
-        SERVICES_WITHOUT_TESTS = "spring-petclinic-admin-server spring-petclinic-genai-service"
-        // Full list of services
-        ALL_SERVICES = "spring-petclinic-admin-server spring-petclinic-api-gateway spring-petclinic-config-server spring-petclinic-customers-service spring-petclinic-discovery-server spring-petclinic-genai-service spring-petclinic-vets-service spring-petclinic-visits-service"
+        DOCKERHUB_USERNAME = "matoupine"
+        GITOPS_REPO = "https://github.com/Akerman0509/spring-petclinic-microservices.git"
+        GITOPS_BRANCH = "main"
+        GIT_CREDENTIALS_ID = "GITHUB_APP_CREDENTIALS_ID"
     }
+
     stages {
-        stage('Check out Branch not Main and take out latest commitID') {
+        stage('Generate Image Tags') {
             steps {
                 script {
-                    echo  "customers-service branch: ${params.CUSTOMERS_SERVICE_BRANCH}"
-                    echo  "visits-service branch: ${params.VISITS_SERVICE_BRANCH}"
-                    echo  "vets-service branch: ${params.VETS_SERVICE_BRANCH}"
-                    echo  "genai-service branch: ${params.GENAI_SERVICE_BRANCH}"
-                    
-                    // Check branches and get commit IDs for non-main branches
-                    if (params.CUSTOMERS_SERVICE_BRANCH != 'main') {
-                        commitIDs['spring-petclinic-customers-service'] = checkoutBranchAndGetCommitID('spring-petclinic-customers-service', params.CUSTOMERS_SERVICE_BRANCH)
+                    def services = [
+                        'customers-service': params.BRANCH_CUSTOMERS,
+                        'visits-service': params.BRANCH_VISITS,
+                        'vets-service': params.BRANCH_VETS,
+                        'genai-service': params.BRANCH_GENAI,
+                        'admin-server': params.BRANCH_ADMIN,
+                        'config-server': params.BRANCH_CONFIG,
+                        'api-gateway': params.BRANCH_GATEWAY,
+                        'discovery-server': params.BRANCH_DISCOVERY
+                    ]
+
+                    IMAGE_TAGS = [:]
+
+                    services.each { service, branch ->
+                        def commit = sh(
+                            script: "git ls-remote ${GITOPS_REPO} refs/heads/${branch} | cut -c1-7",
+                            returnStdout: true
+                        ).trim()
+
+                        if (!commit) {
+                            error "❌ Cannot find branch '${branch}' for service '${service}'"
+                        }
+
+                        IMAGE_TAGS[service] = commit
                     }
-                    
-                    if (params.VISITS_SERVICE_BRANCH != 'main') {
-                        commitIDs['spring-petclinic-visits-service'] = checkoutBranchAndGetCommitID('spring-petclinic-visits-service', params.VISITS_SERVICE_BRANCH)
-                    }
-                    
-                    if (params.VETS_SERVICE_BRANCH != 'main') {
-                        commitIDs['spring-petclinic-vets-service'] = checkoutBranchAndGetCommitID('spring-petclinic-vets-service', params.VETS_SERVICE_BRANCH)
-                    }
-                    
-                    if (params.GENAI_SERVICE_BRANCH != 'main') {
-                        commitIDs['spring-petclinic-genai-service'] = checkoutBranchAndGetCommitID('spring-petclinic-genai-service', params.GENAI_SERVICE_BRANCH)
-                    }
-                    
-                    echo "Commit IDs: ${commitIDs}"
+
+                    echo "📦 Image tags to be used:"
+                    IMAGE_TAGS.each { k, v -> echo " - ${k}: ${v}" }
                 }
             }
         }
 
-        stage('update helm for changed service'){
-            steps{
+        stage('Update GitOps Repository') {
+            steps {
                 script {
-                    // Loop through commitIDs map and update Helm for each service
-                    commitIDs.each { service, commitID ->
-                        echo "Updating Helm for ${service} with commit ID ${commitID}"
-                        updateHelm("akerman0509", service, commitID)
+                    // Clone the GitOps repo
+                    sh "rm -rf gitops"
+                    sh "git clone ${GITOPS_REPO} gitops"
+
+                    // Construct values.yaml path
+                    def valuesPath = "overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
+                    def fullValuesPath = "gitops/${valuesPath}"
+
+                    // Verify the overlays directory exists, create if missing
+                    def overlaysDir = "gitops/overlays/${params.ENVIRONMENT}"
+                    sh "mkdir -p ${overlaysDir}"
+
+                    // Debug: Check existing file content if it exists
+                    if (fileExists(fullValuesPath)) {
+                        def existingContent = readFile(fullValuesPath)
+                        echo "📄 Existing values.yaml content:\n${existingContent}"
+                    } else {
+                        echo "⚠️ No existing values.yaml found at ${fullValuesPath}. Creating new file."
+                    }
+
+                    // Start building YAML content with all fields
+                    def valuesContent = """# PetClinic values for ${params.ENVIRONMENT} environment
+services:
+"""
+
+                    // Hard-code each service with its port and updated image tag
+                    IMAGE_TAGS.each { service, tag ->
+                        def port = service == 'customers-service' ? 8081 :
+                                  service == 'visits-service' ? 8084 :
+                                  service == 'vets-service' ? 8083 :
+                                  service == 'genai-service' ? 8082 :
+                                  service == 'admin-server' ? 9100 :
+                                  service == 'config-server' ? 8888 :
+                                  service == 'api-gateway' ? 8080 :
+                                  service == 'discovery-server' ? 8761 : 8080
+                        valuesContent += """  - name: ${service}
+    image: ${DOCKERHUB_USERNAME}/spring-petclinic-${service}:${tag}
+    port: ${port}
+"""
+                    }
+
+                    // Add the remaining fields from the original values.yaml
+                    valuesContent += """
+service:
+  type: NodePort
+  nodePort: 30080
+
+serviceAccount:
+  create: true
+  name: ""
+
+ingress:
+  enabled: false
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+"""
+
+                    echo "📄 Generated YAML for ${params.ENVIRONMENT}:\n${valuesContent}"
+
+                    // Write the new values file
+                    writeFile file: fullValuesPath, text: valuesContent
+
+                    // Debug: Verify written file content
+                    def writtenContent = readFile(fullValuesPath)
+                    echo "📝 Written values.yaml content:\n${writtenContent}"
+
+                    // Commit and push changes if needed
+                    dir('gitops') {
+                        withCredentials([usernamePassword(credentialsId: GIT_CREDENTIALS_ID, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                            def safeRepo = GITOPS_REPO.replace("https://", "https://${GIT_USERNAME}:${GIT_PASSWORD}@")
+
+                            sh """
+                                git config user.email "strayslugs0509@gmail.com"
+                                git config user.name "akerman0509"
+                                git status
+                                git add ${valuesPath}
+                                git diff --cached
+                                git diff --cached --quiet || git commit -m "Update ${params.ENVIRONMENT} environment with new image tags"
+                                git push ${safeRepo} ${GITOPS_BRANCH}
+                            """
+                        }
                     }
                 }
             }
         }
 
-        stage('Clean') {
+        stage('Show Access Info') {
             steps {
-                echo 'Cleaning workspace and build artifacts...'
-                deleteDir() 
+                script {
+                    echo "🔗 Access app at: http://<WORKER_NODE_IP>:30080"
+                    echo "⚠️ Add domain to /etc/hosts manually if needed."
+                    echo "🔄 ArgoCD will automatically detect and apply changes."
+                }
             }
         }
     }
-}
 
-// Function to checkout a branch and get its commit ID
-def checkoutBranchAndGetCommitID(String servicePath, String branchName) {
-    echo "Checking out ${servicePath} branch ${branchName}"
-    dir(servicePath) {
-        checkout scm
-        // sh "git checkout ${branchName}"
-
-        sh """
-            git fetch origin
-            git checkout ${branchName}
-        """
-        def commitID = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-        echo "Checked out ${servicePath} branch ${branchName} with commit ID: ${commitID}"
-        return commitID
+    post {
+        success {
+            echo "✅ CD Pipeline completed. ArgoCD is synced."
+        }
+        failure {
+            echo "❌ CD process failed."
+        }
     }
-}
-
-def updateHelm(String docker_user, String service, String commitID){
-    // def helmChart = "spring-petclinic-helm"
-    // def helmValues = "spring-petclinic-helm/values.yaml"
-    // def imageName = "akerman0509/${service}"
-    
-    // sh """
-    //     helm upgrade --install --namespace=${namespace} --create-namespace ${service}-${commitID} -f ${helmValues} ${helmChart} \
-    //     --set image.repository=${imageName} \
-    //     --set image.tag=${commitID}
-    // """
-
-
-    def helmChart="./k8s"
-    def helmValues="./k8s/values.yaml"
-    def imageName=docker_user + "/"+ service
-    def namespace = "test-${commitID}"
-    echo "namespace: ${namespace}"
-    echo "imageName: ${imageName}"
-    echo "commitID: ${commitID}"
-    sh """
-        helm upgrade --install --namespace=${namespace} --create-namespace ${service}-${commitID} -f ${helmValues} ${helmChart} \
-        --set image.repository=${imageName} \
-        --set image.tag=${commitID}
-    """
-
 }
