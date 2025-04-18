@@ -102,7 +102,7 @@ def updateHelm(String docker_user, String service, String commitID){
     echo "Using GitOps repo: ${gitOpsRepo}"
 
     // Use Jenkins credentials
-    withCredentials([usernamePassword(credentialsId: 'GITHUB_TOKEN', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+    withCredentials([usernamePassword(credentialsId: 'JenkinsChecksDevops1', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
 
         // Clone GitOps repo with credentials
         sh """
