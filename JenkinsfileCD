@@ -6,10 +6,14 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '5'))
     }
     parameters {
+        string(name: 'ADMIN_SERVER_BRANCH', defaultValue: 'main', description: 'Branch for admin-server')
+        string(name: 'API_GATEWAY_BRANCH', defaultValue: 'main', description: 'Branch for api-gateway')
+        string(name: 'CONFIG_SERVER_BRANCH', defaultValue: 'main', description: 'Branch for config-server')
         string(name: 'CUSTOMERS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for customers-service')
-        string(name: 'VISITS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for visits-service')
+        string(name: 'DISCOVERY_SERVER_BRANCH', defaultValue: 'main', description: 'Branch for discovery-server')
+        // string(name: 'GENAI_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for genai-service')
         string(name: 'VETS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for vets-service')
-        string(name: 'GENAI_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for genai-service')
+        string(name: 'VISITS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for visits-service')
     }
     environment {
         WORKSPACE = "${env.WORKSPACE}"
@@ -81,7 +85,7 @@ def checkoutBranchAndGetCommitID(String servicePath, String branchName) {
             git fetch origin
             git checkout ${branchName}
         """
-        def commitID = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+        def commitID = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
         echo "Checked out ${servicePath} branch ${branchName} with commit ID: ${commitID}"
         return commitID
     }
