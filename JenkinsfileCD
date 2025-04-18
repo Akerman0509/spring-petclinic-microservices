@@ -145,7 +145,9 @@ def updateHelm(String docker_user, String service, String commitID){
             else
                 git commit -m "Update image tag for ${service} to ${docker_user}/${service}:${commitID}"
             fi
-            git push origin main
+            # git push origin main
+            git push https://${GIT_USER}:${GIT_PASS}@${gitOpsRepo} main
+
         """
     }
 }
