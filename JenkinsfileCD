@@ -109,7 +109,7 @@ def updateHelm(String docker_user, String service, String commitID){
     echo "change image tag in ${filePath} to ${docker_user}/${service}:${commitID}"
 
     // Use Jenkins credentials
-    withCredentials([usernamePassword(credentialsId: 'JenkinsChecksDevops1', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+    withCredentials([usernamePassword(credentialsId: 'GITHUB-18-4', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
 
         // Clone GitOps repo with credentials
         sh """
