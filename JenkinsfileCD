@@ -11,7 +11,7 @@ pipeline {
         string(name: 'CONFIG_SERVER_BRANCH', defaultValue: 'main', description: 'Branch for config-server')
         string(name: 'CUSTOMERS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for customers-service')
         string(name: 'DISCOVERY_SERVER_BRANCH', defaultValue: 'main', description: 'Branch for discovery-server')
-        // string(name: 'GENAI_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for genai-service')
+        string(name: 'GENAI_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for genai-service')
         string(name: 'VETS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for vets-service')
         string(name: 'VISITS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for visits-service')
     }
