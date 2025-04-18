@@ -32,21 +32,38 @@ pipeline {
                     echo  "genai-service branch: ${params.GENAI_SERVICE_BRANCH}"
                     
                     // Check branches and get commit IDs for non-main branches
-                    if (params.CUSTOMERS_SERVICE_BRANCH != 'main') {
-                        commitIDs['spring-petclinic-customers-service'] = checkoutBranchAndGetCommitID('spring-petclinic-customers-service', params.CUSTOMERS_SERVICE_BRANCH)
-                    }
-                    
-                    if (params.VISITS_SERVICE_BRANCH != 'main') {
-                        commitIDs['spring-petclinic-visits-service'] = checkoutBranchAndGetCommitID('spring-petclinic-visits-service', params.VISITS_SERVICE_BRANCH)
-                    }
-                    
-                    if (params.VETS_SERVICE_BRANCH != 'main') {
-                        commitIDs['spring-petclinic-vets-service'] = checkoutBranchAndGetCommitID('spring-petclinic-vets-service', params.VETS_SERVICE_BRANCH)
-                    }
-                    
-                    if (params.GENAI_SERVICE_BRANCH != 'main') {
-                        commitIDs['spring-petclinic-genai-service'] = checkoutBranchAndGetCommitID('spring-petclinic-genai-service', params.GENAI_SERVICE_BRANCH)
-                    }
+                // Check branches and get commit IDs for non-main branches
+                if (params.ADMIN_SERVER_BRANCH != 'main') {
+                    commitIDs['spring-petclinic-admin-server'] = checkoutBranchAndGetCommitID('spring-petclinic-admin-server', params.ADMIN_SERVER_BRANCH)
+                }
+
+                if (params.API_GATEWAY_BRANCH != 'main') {
+                    commitIDs['spring-petclinic-api-gateway'] = checkoutBranchAndGetCommitID('spring-petclinic-api-gateway', params.API_GATEWAY_BRANCH)
+                }
+
+                if (params.CONFIG_SERVER_BRANCH != 'main') {
+                    commitIDs['spring-petclinic-config-server'] = checkoutBranchAndGetCommitID('spring-petclinic-config-server', params.CONFIG_SERVER_BRANCH)
+                }
+
+                if (params.CUSTOMERS_SERVICE_BRANCH != 'main') {
+                    commitIDs['spring-petclinic-customers-service'] = checkoutBranchAndGetCommitID('spring-petclinic-customers-service', params.CUSTOMERS_SERVICE_BRANCH)
+                }
+
+                if (params.DISCOVERY_SERVER_BRANCH != 'main') {
+                    commitIDs['spring-petclinic-discovery-server'] = checkoutBranchAndGetCommitID('spring-petclinic-discovery-server', params.DISCOVERY_SERVER_BRANCH)
+                }
+
+                if (params.GENAI_SERVICE_BRANCH != 'main') {
+                    commitIDs['spring-petclinic-genai-service'] = checkoutBranchAndGetCommitID('spring-petclinic-genai-service', params.GENAI_SERVICE_BRANCH)
+                }
+
+                if (params.VETS_SERVICE_BRANCH != 'main') {
+                    commitIDs['spring-petclinic-vets-service'] = checkoutBranchAndGetCommitID('spring-petclinic-vets-service', params.VETS_SERVICE_BRANCH)
+                }
+
+                if (params.VISITS_SERVICE_BRANCH != 'main') {
+                    commitIDs['spring-petclinic-visits-service'] = checkoutBranchAndGetCommitID('spring-petclinic-visits-service', params.VISITS_SERVICE_BRANCH)
+                }
                     
                     echo "Commit IDs: ${commitIDs}"
                 }
