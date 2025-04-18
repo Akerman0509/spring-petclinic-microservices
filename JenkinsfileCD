@@ -113,7 +113,7 @@ def updateHelm(String docker_user, String service, String commitID){
 
         // Clone GitOps repo with credentials
         sh """
-            git clone https://${GIT_USER}:${GIT_PASS}@${gitOpsRepoUrl} ${gitOpsDir}
+            git clone https://${GIT_USER}:${GIT_PASS}@${gitOpsRepo} ${gitOpsDir}
         """
 
         // Update the image tag in the yaml file
