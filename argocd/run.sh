@@ -2,7 +2,7 @@
 
 # Port forward to ArgoCD server
 echo "Port-forwarding to ArgoCD server..."
-# kubectl port-forward svc/argocd-server -n argocd 9000:443
+kubectl port-forward svc/argocd-server -n argocd 9000:443
 
 
 # Wait for port-forward to establish
