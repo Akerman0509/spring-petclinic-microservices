@@ -95,7 +95,7 @@ def updateHelm(String docker_user, String service, String commitID){
     echo "commitID: ${commitID}"
 
     def filename = "${service}.yaml"
-    def gitOpsRepo = "https://github.com/Akerman0509/spring-petclinic-microservices.git"
+    def gitOpsRepo = "github.com/Akerman0509/spring-petclinic-microservices.git"
     def filePath = "spring-petclinic-app/${filename}"
     def gitOpsDir = "./gitops-repo"
 
