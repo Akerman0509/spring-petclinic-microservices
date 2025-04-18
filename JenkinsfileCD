@@ -101,6 +101,11 @@ def updateHelm(String docker_user, String service, String commitID){
 
     echo "Using GitOps repo: ${gitOpsRepo}"
 
+
+    // Use Jenkins credentials
+    echo "Cleaning up potential existing GitOps directory: ${gitOpsDir}"
+    sh "rm -rf ${gitOpsDir}"
+
     echo "change image tag in ${filePath} to ${docker_user}/${service}:${commitID}"
 
     // Use Jenkins credentials
@@ -108,16 +113,20 @@ def updateHelm(String docker_user, String service, String commitID){
 
         // Clone GitOps repo with credentials
         sh """
-            git clone https://${GIT_USER}:${GIT_PASS}@github.com/Akerman0509/gitops-spring-petclinic.git ${gitOpsDir}
+            git clone https://${GIT_USER}:${GIT_PASS}@${gitOpsRepoUrl} ${gitOpsDir}
         """
 
         // Update the image tag in the yaml file
         sh """
             cd ${gitOpsDir}
             ls
+            # Ensure the file path exists before trying to modify
+            if [ ! -f "${filePath}" ]; then
+                echo "Error: File not found at ${filePath}"
+                exit 1
+            fi
             sed -i "s#image: .*#image: ${docker_user}/${service}:${commitID}#" ${filePath}
         """
-
 
         // Commit and push the change
         sh """
@@ -125,11 +134,13 @@ def updateHelm(String docker_user, String service, String commitID){
             git config user.email "strayslugs0509@gmail.com"
             git config user.name "${GIT_USER}"
             git add ${filePath}
-            git commit -m "Update image tag for ${service} to ${docker_user}/${service}:${commitID}" || echo "No changes to commit"
+            # Check if there are changes to commit
+            if git diff --staged --quiet; then
+                echo "No changes to commit"
+            else
+                git commit -m "Update image tag for ${service} to ${docker_user}/${service}:${commitID}"
+            fi
             git push origin main
         """
     }
-
-    // Clean up
-    sh "rm -rf ${gitOpsDir}"
 }
